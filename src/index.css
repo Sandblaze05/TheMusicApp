@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-300;
+  }
+  body {
+    @apply bg-gray-100 text-gray-900;
+  }
+}
+
+
+@layer utilities {
+  .glow {
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    transition: text-shadow 0.3s ease-in-out;
+  }
+
+  .glow:hover {
+    text-shadow: 0 0 30px rgba(255, 255, 255, 1);
+  }
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.8), 0 0 20px rgba(59, 130, 246, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 1), 0 0 30px rgba(59, 130, 246, 0.8);
+    }
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 1.5s infinite ease-in-out;
+  }
+
+  @keyframes pulse-slow {
+    0% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.1);
+    }
+    100% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 5s infinite ease-in-out;
+  }
+}
+
+body {
+  @apply min-h-screen bg-gray-950
+}
