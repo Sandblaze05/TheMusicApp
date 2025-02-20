@@ -207,19 +207,66 @@ const PageTransition = ({ children }) => (
 
 const AppContent = () => {
   const location = useLocation();
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+  const isAuthPage =
+    location.pathname === "/login" || location.pathname === "/signup";
   return (
     <>
-      {!isAuthPage && <Header />}
+      {!isAuthPage && (
+        <motion.div
+          initial={{ opacity: 0, y: -100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="sticky top-0 z-10"
+        >
+          <Header />
+        </motion.div>
+      )}
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
-          <Route path="/library" element={<PageTransition><LibraryPage /></PageTransition>} />
-          <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
-          <Route path="/signup" element={<PageTransition><SignUp /></PageTransition>} />
+          <Route
+            path="/"
+            element={
+              <PageTransition>
+                <HomePage />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/library"
+            element={
+              <PageTransition>
+                <LibraryPage />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PageTransition>
+                <Login />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PageTransition>
+                <SignUp />
+              </PageTransition>
+            }
+          />
         </Routes>
       </AnimatePresence>
-      {!isAuthPage && <Player />}
+      {!isAuthPage && (
+        <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Player />
+      </motion.div>
+      
+      )}
     </>
   );
 };
