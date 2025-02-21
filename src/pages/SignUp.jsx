@@ -108,7 +108,7 @@ const SignUp = () => {
               <Music2 className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Join Us</h1>
-            <p className="text-gray-400">Sign in to your music journey</p>
+            <p className="text-gray-400">Begin your music journey</p>
           </div>
 
           {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}

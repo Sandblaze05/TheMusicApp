@@ -1,9 +1,21 @@
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
-import { useEffect } from "react";
+import { X, Play } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useGlobalContext } from "../GlobalContext";
 
 const AlbumPopup = ({ album, onClose }) => {
+  const { trackList, setTrackList } = useGlobalContext();
+  const { errorPlaying, setErrorPlaying } = useGlobalContext();
+  const { urlPlay, setUrlPlay } = useGlobalContext();
+  const { currentTrack, setCurrentTrack } = useGlobalContext();
+  
   if (!album) return null;
+  
+  // useEffect(() => {
+  //   if(album.tracks?.items) {
+  //     setTrackList(album.tracks.items.map((track) => track.name));
+  //   }
+  // }, [album]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -12,6 +24,39 @@ const AlbumPopup = ({ album, onClose }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  const handlePlay = () => {
+    if(album.tracks?.items) {
+      setTrackList(album.tracks.items.map((track) => track.name));
+    }
+    console.log('Playing album:', album.name);
+    // setTimeout(() => getLink(), 1000);
+  };
+
+  // const getLink = async () => {
+  //   if (trackList.length === 0) return
+  //   const [firstTrack, ...remainingTracks] = trackList;
+  //   try {
+  //     const response = await fetch(`https://saavn.dev/api/search/songs?query=${firstTrack}&limit=1`);
+  //     if (!response.ok) {
+  //       throw new Error('Failed to get song.');
+  //     }
+  //     const data = await response.json();
+  //     setUrlPlay(data);
+  //     console.log(data);
+  //   } 
+  //   catch (err) {
+  //     setErrorPlaying(`Error in getting song: ${err}`);
+  //     console.log(err);
+  //     setUrlPlay(null);
+  //   }
+  //   finally {
+  //     setCurrentTrack(firstTrack);
+  //     console.log('Current track: ', firstTrack);
+  //     setTrackList(remainingTracks);
+  //   }
+
+  // };
 
   return (
     <div
@@ -33,15 +78,29 @@ const AlbumPopup = ({ album, onClose }) => {
 
         {/* Album Info */}
         <div className="flex gap-4">
-          <img
-            src={album.images?.[0]?.url}
-            alt={album.name}
-            className="w-24 h-24 rounded-md"
-          />
-          <div>
+          <div className="relative group">
+            <img
+              src={album.images?.[0]?.url}
+              alt={album.name}
+              className="w-[150px] h-[150px] rounded-md"
+            />
+            <button
+              onClick={handlePlay}
+              className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+            >
+              <Play className="w-12 h-12 text-white fill-white" />
+            </button>
+          </div>
+          <div className="flex flex-col">
             <h2 className="text-xl font-bold">{album.name}</h2>
             <p className="text-zinc-400">{album.artists?.map(a => a.name).join(", ")}</p>
             <p className="text-sm text-zinc-500">{album.release_date}</p>
+            <button
+              onClick={handlePlay}
+              className="mt-2 flex items-center gap-2 bg-white hover:bg-gray-300 text-black font-semibold py-2 px-4 rounded-full w-fit"
+            >
+              <Play className="w-4 h-4 fill-black" />
+            </button>
           </div>
         </div>
 
