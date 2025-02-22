@@ -9,6 +9,7 @@ import LibraryPage from "./pages/Library";
 import { useDebounce } from "react-use";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
+import TrackInfo from "./components/TrackInfo";
 import { auth } from "./firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { AnimatePresence, motion } from "framer-motion";
@@ -135,8 +136,6 @@ const Player = () => {
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  
-
   // Add event listeners to sync audio state
   useEffect(() => {
     const audio = audioRef.current;
@@ -151,14 +150,14 @@ const Player = () => {
       }
     };
 
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
 
     return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [currentIndex, queue.length, setIsPlaying]);
 
@@ -178,12 +177,12 @@ const Player = () => {
           `https://saavn.dev/api/search/songs?query=${trackName}&limit=1`
         );
         if (!response.ok) throw new Error("Failed to fetch track data");
-        
+
         const data = await response.json();
         if (!data?.data?.results?.length) {
           throw new Error("No track found");
         }
-  
+
         console.log(data.data.results[0]);
         setUrlPlay(data.data.results[0]);
         setErrorPlaying("");
@@ -200,21 +199,22 @@ const Player = () => {
   const loadTrack = useCallback(
     async (index) => {
       if (index >= 0 && index < queue.length) {
-        console.log('loadtrack');
+        console.log("loadtrack");
         const trackName = queue[index];
         const trackData = await fetchTrackData(trackName);
 
         if (trackData) {
           setCurrentTrack(trackName);
           setCurrentIndex(index);
-          if (!isPlaying) {
-            setIsPlaying(true);
-          }
+          // if (!isPlaying) {
+          //   setIsPlaying(true);
+          // }
           // Attempt to play after loading new track
           try {
             const playPromise = audioRef.current?.play();
             if (playPromise) {
-              playPromise.catch(error => {
+              console.log("Attempting to play next");
+              playPromise.catch((error) => {
                 console.error("Playback failed:", error);
                 setIsPlaying(false);
               });
@@ -231,7 +231,7 @@ const Player = () => {
 
   const playTrackDirectly = useCallback(
     async (trackName) => {
-      console.log('Playing track directly:', trackName);
+      console.log("Playing track directly:", trackName);
       const trackData = await fetchTrackData(trackName);
 
       if (trackData) {
@@ -240,7 +240,7 @@ const Player = () => {
         try {
           const playPromise = audioRef.current?.play();
           if (playPromise) {
-            playPromise.catch(error => {
+            playPromise.catch((error) => {
               console.error("Playback failed:", error);
               setIsPlaying(false);
             });
@@ -267,6 +267,10 @@ const Player = () => {
   }, [playTrackDirectly]);
 
   useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume / 100;
+  }, [volume]);
+
+  useEffect(() => {
     if (queue.length > 0 && !currentTrack) {
       loadTrack(0);
     }
@@ -274,7 +278,7 @@ const Player = () => {
 
   const handlePlayPause = async () => {
     if (!audioRef.current) return;
-    
+
     try {
       if (audioRef.current.paused) {
         const playPromise = audioRef.current.play();
@@ -312,37 +316,38 @@ const Player = () => {
       setProgress(isNaN(progressPercent) ? 0 : progressPercent);
     };
 
-    audio.addEventListener('timeupdate', updateProgress);
-    return () => audio.removeEventListener('timeupdate', updateProgress);
+    audio.addEventListener("timeupdate", updateProgress);
+    return () => audio.removeEventListener("timeupdate", updateProgress);
   }, []);
 
-  const currentTrackInfo = urlPlay ?? {};
-  const highQualityUrl = currentTrackInfo?.downloadUrl?.find(
-    (item) => item.quality === "320kbps"
-  )?.url || "";
-  
+  const currentTrackInfo = urlPlay ?? { name: "No track selected" };
+  const highQualityUrl =
+    currentTrackInfo?.downloadUrl?.find((item) => item.quality === "320kbps")
+      ?.url || "";
+
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-lg bg-gray-900/80 backdrop-blur-lg rounded-2xl shadow-lg flex items-center justify-between px-4 py-3">
       {/* Track Info */}
       <div className="flex items-center space-x-3">
-        <img
-          src={currentTrackInfo?.image?.[2]?.url || "/image.png"}
-          alt="Album Cover"
-          className={`h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500 transition ${
-            isPlaying ? "pulse-glow" : ""
-          }`}
-        />
+        {currentTrackInfo?.image?.[2]?.url ? (
+          <img
+            src={currentTrackInfo.image[2].url}
+            className={`h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500 transition ${
+              isPlaying ? "pulse-glow" : ""
+            }`}
+          />
+        ) : (
+          <div className="h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500" />
+        )}
         <div>
-          <p className="text-white text-sm font-semibold">
-            {currentTrackInfo?.name || currentTrack || "No Track Selected"}
-          </p>
-          <p className="text-gray-400 text-xs">
-            {currentTrackInfo?.artists?.primary?.map((artist) => artist.name).join(", ") || "Unknown Artist"}
-          </p>
+          <TrackInfo
+            currentTrackInfo={currentTrackInfo}
+            currentTrack={currentTrackInfo}
+          />
         </div>
       </div>
 
-      <audio ref={audioRef} src={highQualityUrl} preload="auto" />
+      <audio ref={audioRef} src={highQualityUrl} preload="auto" autoPlay />
 
       {/* Controls */}
       <div className="flex items-center space-x-4">
