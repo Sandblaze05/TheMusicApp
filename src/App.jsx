@@ -14,6 +14,7 @@ import { auth } from "./firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGlobalContext } from "./GlobalContext";
+import SearchPage from "./pages/SearchPage";
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +26,12 @@ const Header = () => {
   const handleLogOut = async () => {
     await auth.signOut();
     navigate("/login");
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && debouncedSearchTerm !=="") {
+      navigate(`/search/${debouncedSearchTerm}`);
+    }
   };
 
   useEffect(() => {
@@ -73,6 +80,7 @@ const Header = () => {
               className="pl-8 w-full bg-gray-800 text-gray-100 placeholder-gray-400 border border-gray-600 rounded-2xl p-2 focus:ring-2 focus:ring-gray-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyPress}
             />
           </div>
         </div>
@@ -474,6 +482,14 @@ const AppContent = () => {
             element={
               <PageTransition>
                 <SignUp />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/search/:query"
+            element={
+              <PageTransition>
+                <SearchPage />
               </PageTransition>
             }
           />

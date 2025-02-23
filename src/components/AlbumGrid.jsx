@@ -8,11 +8,11 @@ const AlbumGrid = ({ albums, loading, token }) => {
     album.available_markets?.includes("IN")
   );
   const [albumContent, setAlbumContent] = useState(null);
-  const [fetchURL, setFetchURL] = useState('');
+  // const [fetchURL, setFetchURL] = useState('');
   const [error, setError] = useState('');
   const [albumLoading, setAlbumLoading] = useState(false);
 
-  const getContent = async () => {
+  const getContent = async (fetchURL) => {
     setAlbumLoading(true);
     try {
       if (fetchURL !== ''){
@@ -41,9 +41,9 @@ const AlbumGrid = ({ albums, loading, token }) => {
     }
   };
 
-  useEffect(() => {
-    getContent();
-  }, [fetchURL]);
+  // useEffect(() => {
+  //   getContent();
+  // }, [fetchURL]);
 
   if (loading) {
     return (
@@ -82,7 +82,7 @@ const AlbumGrid = ({ albums, loading, token }) => {
           <div
             key={album.id}
             className="relative cursor-default rounded-md overflow-hidden transition-all duration-300 min-w-[150px] md:min-w-0 hover:scale-[1.02] hover:shadow-[0_0_10px_rgb(255,255,255,0.8)]"
-            onClick={() => setFetchURL(album.href)}
+            onClick={() => getContent(album.href)}
           >
             <div className="w-full">
               <AspectRatio.Root ratio={1}>
