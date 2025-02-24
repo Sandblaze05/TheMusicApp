@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import MusicCard from "../components/MusicCard";
 import AlbumGrid from "../components/AlbumGrid";
 import { motion } from "framer-motion";
+import { useGlobalContext } from "../GlobalContext";
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const [token, setToken] = useState(null);
+  const { token, setToken } = useGlobalContext();
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
   const stableUser = useMemo(() => user, [user]);
@@ -91,8 +92,7 @@ const HomePage = () => {
       console.error(errorMessage);
       setError(errorMessage);
       setNewReleases([]);
-    }
-    finally {
+    } finally {
       setLoading(false);
     }
   };
@@ -128,14 +128,14 @@ const HomePage = () => {
     <main className="min-h-screen p-4 mt-1 text-white text-3xl">
       <div className="">
         <motion.div
-          initial={{opacity: 0, y: 10}}
-          animate={{opacity: 1, y: 0}}
-          transition={{duration: 0.7, ease: 'easeOut'}}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
           className=" p-4 text-3xl font-bold text-gray-100 hover:text-white glow"
         >
           | New Releases
         </motion.div>
-        <AlbumGrid loading={loading} albums={newReleases} token={token}/>
+        <AlbumGrid loading={loading} albums={newReleases} token={token} />
       </div>
     </main>
   );

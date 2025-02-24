@@ -8,6 +8,7 @@ const AlbumPopup = ({ album, onClose }) => {
   const { errorPlaying, setErrorPlaying } = useGlobalContext();
   const { urlPlay, setUrlPlay } = useGlobalContext();
   const { currentTrack, setCurrentTrack } = useGlobalContext();
+  const { queueState, setQueueState } = useGlobalContext();
   
   if (!album) return null;
   
@@ -27,36 +28,12 @@ const AlbumPopup = ({ album, onClose }) => {
 
   const handlePlay = () => {
     if(album.tracks?.items) {
+      setQueueState(false);
       setTrackList(album.tracks.items.map((track) => track.name));
     }
     console.log('Playing album:', album.name);
     // setTimeout(() => getLink(), 1000);
   };
-
-  // const getLink = async () => {
-  //   if (trackList.length === 0) return
-  //   const [firstTrack, ...remainingTracks] = trackList;
-  //   try {
-  //     const response = await fetch(`https://saavn.dev/api/search/songs?query=${firstTrack}&limit=1`);
-  //     if (!response.ok) {
-  //       throw new Error('Failed to get song.');
-  //     }
-  //     const data = await response.json();
-  //     setUrlPlay(data);
-  //     console.log(data);
-  //   } 
-  //   catch (err) {
-  //     setErrorPlaying(`Error in getting song: ${err}`);
-  //     console.log(err);
-  //     setUrlPlay(null);
-  //   }
-  //   finally {
-  //     setCurrentTrack(firstTrack);
-  //     console.log('Current track: ', firstTrack);
-  //     setTrackList(remainingTracks);
-  //   }
-
-  // };
 
   return (
     <div

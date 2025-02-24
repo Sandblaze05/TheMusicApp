@@ -29,8 +29,8 @@ const Header = () => {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter" && debouncedSearchTerm !=="") {
-      navigate(`/search/${debouncedSearchTerm}`);
+    if (e.key === "Enter" && searchQuery !== "") {
+      navigate(`/search/${searchQuery}`);
     }
   };
 
@@ -136,6 +136,7 @@ const Player = () => {
   const { currentTrack, setCurrentTrack } = useGlobalContext();
   const { errorPlaying, setErrorPlaying } = useGlobalContext();
   const { urlPlay, setUrlPlay } = useGlobalContext();
+  const { queueState, setQueueState } = useGlobalContext();
   const audioRef = useRef(null);
 
   // Local states
@@ -172,10 +173,19 @@ const Player = () => {
   // Update queue when trackList changes
   useEffect(() => {
     if (trackList.length > 0) {
-      setQueue((prevQueue) => [...prevQueue, ...trackList]);
+      if (queueState) {
+        // Append to existing queue
+        setQueue((prevQueue) => [...prevQueue, ...trackList]);
+      } else {
+        // Override queue and reset current index
+        setQueue(trackList);
+        setCurrentIndex(0);
+        // Force reload of first track in new queue
+        loadTrack(0, trackList);
+      }
       setTrackList([]);
     }
-  }, [trackList, setTrackList]);
+  }, [trackList, queueState, setTrackList]);
 
   const fetchTrackData = useCallback(
     async (trackName) => {
@@ -205,27 +215,26 @@ const Player = () => {
   );
 
   const loadTrack = useCallback(
-    async (index) => {
-      if (index >= 0 && index < queue.length) {
+    async (index, queueToUse = queue) => {
+      if (index >= 0 && index < queueToUse.length) {
         console.log("loadtrack");
-        const trackName = queue[index];
+        const trackName = queueToUse[index];
         const trackData = await fetchTrackData(trackName);
 
         if (trackData) {
           setCurrentTrack(trackName);
           setCurrentIndex(index);
-          // if (!isPlaying) {
-          //   setIsPlaying(true);
-          // }
-          // Attempt to play after loading new track
+
           try {
-            const playPromise = audioRef.current?.play();
-            if (playPromise) {
-              console.log("Attempting to play next");
-              playPromise.catch((error) => {
-                console.error("Playback failed:", error);
-                setIsPlaying(false);
-              });
+            if (audioRef.current) {
+              const playPromise = audioRef.current.play();
+              if (playPromise) {
+                console.log("Attempting to play next");
+                playPromise.catch((error) => {
+                  console.error("Playback failed:", error);
+                  setIsPlaying(false);
+                });
+              }
             }
           } catch (error) {
             console.error("Play error:", error);
@@ -234,11 +243,13 @@ const Player = () => {
         }
       }
     },
-    [queue, fetchTrackData, setCurrentTrack, setIsPlaying, isPlaying]
+    [queue, fetchTrackData, setCurrentTrack, setIsPlaying]
   );
 
   const playTrackDirectly = useCallback(
     async (trackName) => {
+      setQueueState(false);
+      // setQueue([]);
       console.log("Playing track directly:", trackName);
       const trackData = await fetchTrackData(trackName);
 
@@ -336,18 +347,19 @@ const Player = () => {
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-lg bg-gray-900/80 backdrop-blur-lg rounded-2xl shadow-lg flex items-center justify-between px-4 py-3">
       {/* Track Info */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-3 min-w-0">
         {currentTrackInfo?.image?.[2]?.url ? (
           <img
             src={currentTrackInfo.image[2].url}
             className={`h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500 transition ${
               isPlaying ? "pulse-glow" : ""
             }`}
+            alt="Track artwork"
           />
         ) : (
           <div className="h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500" />
         )}
-        <div>
+        <div className="min-w-0 flex-shrink">
           <TrackInfo
             currentTrackInfo={currentTrackInfo}
             currentTrack={currentTrackInfo}
@@ -385,8 +397,8 @@ const Player = () => {
         </button>
       </div>
 
-      {/* Volume */}
-      <div className="flex items-center space-x-2">
+      {/* Volume - Hidden on mobile */}
+      <div className="hidden md:flex items-center space-x-2">
         <Volume2 className="h-5 w-5 text-gray-300" />
         <input
           type="range"
@@ -405,8 +417,12 @@ const Player = () => {
       {/* Progress Bar */}
       <div
         className={`absolute bottom-0 left-1 w-[calc(100%-7px)] h-1 bg-gray-700 rounded-b-2xl overflow-hidden 
-        transition-opacity duration-500 ease-in-out transform 
-        ${isPlaying ? "opacity-100 translate-y-0" : "opacity-0 translate-y-0"}`}
+            transition-opacity duration-500 ease-in-out transform 
+            ${
+              isPlaying
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-0"
+            }`}
       >
         <div
           className="h-full bg-blue-400 transition-all"
