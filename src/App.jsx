@@ -145,20 +145,23 @@ const Player = () => {
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [user, setUser] = useState(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  const saveCurrentQueue = async (userId, track) => {
-    if (!userId) {
+  const saveCurrentQueue = async (userId, currentQueue) => {
+    if (!userId || !initialLoadComplete) {
       return;
     }
-    await setDoc(doc(db, "users", userId), { savedQueue: queue }, { merge: true });
+    if (currentQueue && currentQueue.length > 0) {
+      await setDoc(doc(db, "users", userId), { savedQueue: currentQueue }, { merge: true });
+    }
   };
 
   const getSavedQueue = async (userId) => {
     if (!userId) {
-      return;
+      return [];
     }
     const userDoc = await getDoc(doc(db, 'users', userId));
-    return userDoc.exists() ? userDoc.data().savedQueue : "";
+    return userDoc.exists() && userDoc.data().savedQueue ? userDoc.data().savedQueue : [];
   };
 
   useEffect(() => {
@@ -166,11 +169,15 @@ const Player = () => {
       if (user) {
         setUser(user);
         const saved = await getSavedQueue(user.uid);
-        setQueue(saved);
+        if (saved && saved.length > 0) {
+          setQueue(saved);
+        }
+        setInitialLoadComplete(true); // Mark initial load as complete after fetching saved queue
       }
       else {
         setUser(null);
         setQueue([]);
+        setInitialLoadComplete(false);
       }
     });
 
@@ -178,10 +185,10 @@ const Player = () => {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && initialLoadComplete) { // Only save if initial load is complete
       saveCurrentQueue(user.uid, queue);
     }
-  }, [queue, user]);
+  }, [queue, user, initialLoadComplete]);
 
   // Add event listeners to sync audio state
   useEffect(() => {
