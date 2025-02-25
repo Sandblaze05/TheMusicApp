@@ -10,7 +10,7 @@ import { useDebounce } from "react-use";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import TrackInfo from "./components/TrackInfo";
-import { auth } from "./firebase/firebase";
+import { auth, db, doc, setDoc, getDoc } from "./firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGlobalContext } from "./GlobalContext";
@@ -144,14 +144,62 @@ const Player = () => {
   const [progress, setProgress] = useState(0);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [user, setUser] = useState(null);
+
+  const saveCurrentQueue = async (userId, track) => {
+    if (!userId) {
+      return;
+    }
+    await setDoc(doc(db, "users", userId), { savedQueue: queue }, { merge: true });
+  };
+
+  const getSavedQueue = async (userId) => {
+    if (!userId) {
+      return;
+    }
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    return userDoc.exists() ? userDoc.data().savedQueue : "";
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUser(user);
+        const saved = await getSavedQueue(user.uid);
+        setQueue(saved);
+      }
+      else {
+        setUser(null);
+        setQueue([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      saveCurrentQueue(user.uid, queue);
+    }
+  }, [queue, user]);
 
   // Add event listeners to sync audio state
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
+    };
     const handleEnded = () => {
       setIsPlaying(false);
       if (currentIndex < queue.length - 1) {
@@ -162,6 +210,32 @@ const Player = () => {
     audio.addEventListener("play", handlePlay);
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
+
+    if ("mediaSession" in navigator && currentTrack && urlPlay) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack,
+        artist: currentTrackInfo?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist",
+        artwork: [
+          { src: urlPlay.image?.[2]?.url || "default-cover.jpg", sizes: "96x96", type: "image/jpeg" }
+        ]
+      });
+  
+      navigator.mediaSession.setActionHandler("play", () => {
+        audio.play();
+      });
+  
+      navigator.mediaSession.setActionHandler("pause", () => {
+        audio.pause();
+      });
+  
+      navigator.mediaSession.setActionHandler("previoustrack", () => {
+        handlePrevious();
+      });
+  
+      navigator.mediaSession.setActionHandler("nexttrack", () => {
+        handleNext();
+      });
+    }
 
     return () => {
       audio.removeEventListener("play", handlePlay);
