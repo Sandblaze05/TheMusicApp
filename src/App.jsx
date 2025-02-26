@@ -197,15 +197,9 @@ const Player = () => {
 
     const handlePlay = () => {
       setIsPlaying(true);
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "playing";
-      }
     };
     const handlePause = () => {
       setIsPlaying(false);
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "paused";
-      }
     };
     const handleEnded = () => {
       setIsPlaying(false);
@@ -218,38 +212,61 @@ const Player = () => {
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
 
-    if ("mediaSession" in navigator && currentTrack && urlPlay) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentTrack,
-        artist: currentTrackInfo?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist",
-        artwork: [
-          { src: urlPlay.image?.[2]?.url || "default-cover.jpg", sizes: "96x96", type: "image/jpeg" }
-        ]
-      });
-  
-      navigator.mediaSession.setActionHandler("play", () => {
-        audio.play();
-      });
-  
-      navigator.mediaSession.setActionHandler("pause", () => {
-        audio.pause();
-      });
-  
-      navigator.mediaSession.setActionHandler("previoustrack", () => {
-        handlePrevious();
-      });
-  
-      navigator.mediaSession.setActionHandler("nexttrack", () => {
-        handleNext();
-      });
-    }
-
     return () => {
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
     };
   }, [currentIndex, queue.length, setIsPlaying]);
+
+  // browser navigator api
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentTrack || !urlPlay) {
+      return;
+    }
+    const artwork = [];
+    if (urlPlay?.image?.[2]?.url) {
+      artwork.push({ src: urlPlay.image[2].url, sizes: "96x96", type: "image/jpeg" });
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack || "Unknown Track",
+      artist: urlPlay?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist",
+      album: urlPlay?.album?.name || "Unknown Album",
+      artwork: artwork.length ? artwork : [{ src: "/default-cover.jpg", sizes: "96x96", type: "image/jpeg" }] 
+    });
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      audioRef.current?.play().catch(e => console.error("Play failed: ", e));
+    });
+
+    navigator.mediaSession.setActionHandler("pause", () => {
+      audioRef.current?.pause();
+    });
+
+    navigator.mediaSession.setActionHandler("previoustrack", handlePrevious);
+    navigator.mediaSession.setActionHandler("nexttrack", handleNext);
+
+  }, [currentTrack, urlPlay, isPlaying]);
+
+// update the page title when the current track changes
+useEffect(() => {
+  if (currentTrack && urlPlay) {
+    const artistName = urlPlay?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist";
+
+    if (isPlaying) {
+      document.title = `♫ ${currentTrack} - ${artistName}`;
+    } else {
+      document.title = `♫ ${currentTrack} - ${artistName}`;
+    }
+    
+    return () => {
+      document.title = "Boomify"; 
+    };
+  }
+}, [currentTrack, urlPlay, isPlaying]);
 
   // Update queue when trackList changes
   useEffect(() => {
@@ -384,13 +401,24 @@ const Player = () => {
         const playPromise = audioRef.current.play();
         if (playPromise) {
           await playPromise;
+          setIsPlaying(true);
+          if ("mediaSession" in navigator) {
+            navigator.mediaSession.playbackState = "playing";
+          }
         }
       } else {
         audioRef.current.pause();
+        setIsPlaying(false);
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "paused";
+        }
       }
     } catch (error) {
       console.error("PlayPause error:", error);
       setIsPlaying(false);
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
     }
   };
 
