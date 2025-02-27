@@ -55,5 +55,5 @@
 }
 
 body {
-  @apply min-h-screen bg-gray-950
+  @apply min-h-screen bg-gray-950 overflow-x-hidden
 }

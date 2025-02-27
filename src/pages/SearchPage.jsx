@@ -4,17 +4,24 @@ import { useNavigate, useParams } from "react-router-dom";
 import { auth } from "../firebase/firebase";
 import { useGlobalContext } from "../GlobalContext";
 import { Play, Clock, Music } from "lucide-react";
+import { motion } from "framer-motion";
 import AlbumPopup from "../components/AlbumPopup";
 
 const SearchPage = () => {
   const { query } = useParams();
   const { token, setToken } = useGlobalContext();
+  const { setTrackList, setQueueState } = useGlobalContext();
   const [user, setUser] = useState(null);
   const [result, setResult] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [albumContent, setAlbumContent] = useState(null);
   const navigate = useNavigate();
+
+  const handleSinglePlay = (trackName) => {
+    setQueueState(false);
+    setTrackList([trackName]);
+  };
 
   const spotifyToken = async () => {
     console.log("getting token");
@@ -58,7 +65,7 @@ const SearchPage = () => {
       setToken(null);
     }
   };
-  
+
   const fetchQuery = async () => {
     console.log(token);
     setLoading(true);
@@ -92,7 +99,7 @@ const SearchPage = () => {
 
   const getContent = async (fetchURL) => {
     try {
-      if (fetchURL !== ''){
+      if (fetchURL !== "") {
         const authOptions = {
           method: "GET",
           headers: {
@@ -144,20 +151,28 @@ const SearchPage = () => {
   // Tracks Section
   const TracksSection = () => {
     if (!result?.tracks?.items?.length) return null;
-    
+
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-white mb-4">Songs</h2>
+        {/* {<h2 className="text-xl font-bold text-white mb-4">Songs</h2>} */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className=" py-4 px-0 w-fit text-3xl font-bold text-gray-100 hover:text-white glow"
+        >
+          | Songs
+        </motion.div>
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-lg overflow-hidden">
           {result.tracks.items.map((track) => (
-            <div 
+            <div
               key={track.id}
               className="group flex items-center gap-4 p-3 hover:bg-gray-700/50 transition-colors duration-200 border-b border-gray-700/50 last:border-0"
-              onClick={() => window.playTrackDirectly(track.name)}
+              onClick={() => handleSinglePlay(track.name)}
             >
               <div className="w-12 h-12 relative flex-shrink-0">
-                <img 
-                  src={track.album?.images[0]?.url} 
+                <img
+                  src={track.album?.images[0]?.url}
                   alt={track.name}
                   className="w-full h-full object-cover rounded"
                 />
@@ -168,7 +183,7 @@ const SearchPage = () => {
               <div className="flex-grow min-w-0">
                 <p className="text-white truncate">{track.name}</p>
                 <p className="text-gray-400 text-sm truncate">
-                  {track.artists.map(a => a.name).join(', ')}
+                  {track.artists.map((a) => a.name).join(", ")}
                 </p>
               </div>
               <div className="text-gray-400 text-sm flex-shrink-0">
@@ -204,11 +219,13 @@ const SearchPage = () => {
                   <Play className="h-6 w-6 text-white" />
                 </div>
               </div>
-              
+
               <div className="text-center">
-                <h3 className="text-white font-semibold truncate">{artist.name}</h3>
+                <h3 className="text-white font-semibold truncate">
+                  {artist.name}
+                </h3>
                 <p className="text-gray-400 text-sm truncate">
-                  {artist.genres?.slice(0, 2).join(' • ')}
+                  {artist.genres?.slice(0, 2).join(" • ")}
                 </p>
               </div>
 
@@ -226,35 +243,53 @@ const SearchPage = () => {
 
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-white mb-4">Albums</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {result.albums.items.map((album) => (
-            <div
-              key={album.id}
-              className="bg-gray-800/50 rounded-lg p-4 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-300 group relative"
-              onClick={() => getContent(album.href)}
-            >
-              <div className="relative aspect-square mb-3 overflow-hidden rounded-lg">
-                <img
-                  src={album.images[0]?.url}
-                  alt={album.name}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-white font-semibold truncate">{album.name}</h3>
-                <p className="text-gray-400 text-sm truncate">
-                  {album.artists?.map(a => a.name).join(', ')}
-                </p>
-              </div>
+        {/* {<h2 className="text-xl font-bold text-white mb-4">Albums</h2>} */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className=" py-4 px-0 w-fit text-3xl font-bold text-gray-100 hover:text-white glow"
+        >
+          | Albums
+        </motion.div>
 
-              <div className="absolute -inset-px bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+        {/* Container with overflow handling */}
+        <div className="relative -mx-4 px-4">
+          {/* Overflow container */}
+          <div className="overflow-x-auto pb-4 -mb-4 scrollbar-hide">
+            {/* Fixed width items in a flex row on mobile, grid on larger screens */}
+            <div className="flex md:grid md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-4 min-w-max md:min-w-0">
+              {result.albums.items.map((album) => (
+                <div
+                  key={album.id}
+                  className="bg-gray-800/50 rounded-lg p-4 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-300 group relative w-36 flex-shrink-0 md:w-auto"
+                  onClick={() => getContent(album.href)}
+                >
+                  <div className="relative aspect-square mb-3 overflow-hidden rounded-lg">
+                    <img
+                      src={album.images[0]?.url}
+                      alt={album.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Play className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-white font-semibold truncate">
+                      {album.name}
+                    </h3>
+                    <p className="text-gray-400 text-sm truncate">
+                      {album.artists?.map((a) => a.name).join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="absolute -inset-px bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     );
@@ -262,11 +297,15 @@ const SearchPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8 mb-15">
         <TracksSection />
-        <ArtistsSection />
         <AlbumsSection />
-        {albumContent && <AlbumPopup album={albumContent} onClose={() => setAlbumContent(null)}/>}
+        {albumContent && (
+          <AlbumPopup
+            album={albumContent}
+            onClose={() => setAlbumContent(null)}
+          />
+        )}
       </div>
     </div>
   );

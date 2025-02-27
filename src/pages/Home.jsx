@@ -131,7 +131,7 @@ const HomePage = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className=" p-4 text-3xl font-bold text-gray-100 hover:text-white glow"
+          className=" p-4 w-fit text-3xl font-bold text-gray-100 hover:text-white glow"
         >
           | New Releases
         </motion.div>

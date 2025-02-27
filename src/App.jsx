@@ -47,7 +47,7 @@ const Header = () => {
   }, []);
 
   return (
-    <header className="sticky top-0 z-10 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700 rounded-b-2xl shadow-lg">
+    <header className="sticky top-0 z-10 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700 rounded-b-2xl shadow-lg max-w-screen">
       <div className="w-screen  px-4 py-3 flex items-center justify-between">
         {/* Navigation Links */}
         <nav className="flex items-center space-x-4">
@@ -87,7 +87,7 @@ const Header = () => {
 
         {/* Profile Dropdown */}
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger className="focus:outline-none">
+          <DropdownMenu.Trigger className="focus:outline-none mr-3">
             <div className="h-9 w-9 rounded-full overflow-hidden border border-gray-600 transition hover:shadow-[0_0_10px_rgb(255,255,255,0.8)] bg-gradient-to-b from-gray-700 to-gray-500">
               {user ? (
                 <span className="text-white text-lg font-semibold">
