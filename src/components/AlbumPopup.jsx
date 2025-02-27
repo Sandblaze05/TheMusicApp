@@ -21,11 +21,22 @@ const AlbumPopup = ({ album, onClose }) => {
         navigate("/login");
       } else {
         setUser(user);
-        checkIfFavorited(user.uid, album.id) ? setIsFavorited(true) : setIsFavorited(false);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
+
+  // Separate useEffect to check favorite status when user or album changes
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (user && album?.id) {
+        const isItemFavorited = await checkIfFavorited(user.uid, album.id);
+        setIsFavorited(isItemFavorited);
+      }
+    };
+
+    checkFavoriteStatus();
+  }, [user, album?.id]); // Depend on user and album.id to re-run when they change
 
   const checkIfFavorited = async (userId, itemId) => {
     if (!userId || !itemId) return false;
@@ -34,13 +45,12 @@ const AlbumPopup = ({ album, onClose }) => {
       const favoriteRef = doc(db, `users/${userId}/favorites`, itemId);
       const docSnap = await getDoc(favoriteRef);
       return docSnap.exists();
-    }
-    catch (err) {
-      console.error('error in checking favorite status');
+    } catch (err) {
+      console.error("Error checking favorite status:", err);
       return false;
     }
   };
-  
+
   const toggleFavorite = async (id, type) => {
     if (!user) {
       console.log("User didn't login");
@@ -48,16 +58,19 @@ const AlbumPopup = ({ album, onClose }) => {
     }
     const favoriteRef = doc(db, `users/${user.uid}/favorites`, id);
 
-    if (isFavorited) {
-      await deleteDoc(favoriteRef);
-      console.log(`Removed ${type} ${id} from favorites`);
-    }
-    else {
-      await setDoc(favoriteRef, { id, type, timestamp: Date.now() });
-      console.log(`Added ${type} ${id} to favorites`);
-    }
+    try {
+      if (isFavorited) {
+        await deleteDoc(favoriteRef);
+        console.log(`Removed ${type} ${id} from favorites`);
+      } else {
+        await setDoc(favoriteRef, { id, type, timestamp: Date.now() });
+        console.log(`Added ${type} ${id} to favorites`);
+      }
 
-    setIsFavorited((prev) => !prev);
+      setIsFavorited((prev) => !prev);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
   };
 
   useEffect(() => {
@@ -100,7 +113,7 @@ const AlbumPopup = ({ album, onClose }) => {
         exit={{ opacity: 0, y: 20 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="relative bg-zinc-900 text-zinc-100 rounded-2xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col md:flex-row"
-        style={{ maxWidth: "min(90vw, 768px)" }} // Ensures proper width constraint
+        style={{ maxWidth: "min(90vw, 768px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Section with Image and Main Info */}
@@ -168,14 +181,18 @@ const AlbumPopup = ({ album, onClose }) => {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => toggleFavorite(album.id, 'album')}
+              onClick={() => toggleFavorite(album.id, "album")}
               className={`p-1 md:p-2 rounded-full transition-colors ${
                 isFavorited
                   ? "bg-red-600 text-white"
                   : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
               }`}
             >
-              <Heart className="w-4 h-4 md:w-5 md:h-5" />
+              <Heart
+                className={`w-4 h-4 md:w-5 md:h-5 ${
+                  isFavorited ? "fill-white" : ""
+                }`}
+              />
             </motion.button>
           </div>
         </div>
