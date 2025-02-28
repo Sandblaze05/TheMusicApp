@@ -59,7 +59,7 @@ const TrackInfo = ({ currentTrackInfo, currentTrack }) => {
   const artists = currentTrackInfo?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist";
 
   return (
-    <div className="w-48 sm:w-32"> {/* Adjust width based on screen size */}
+    <div className="w-39 sm:w-32 md:w-32">
       <ScrollingText
         text={trackName}
         className="text-white text-sm font-semibold"

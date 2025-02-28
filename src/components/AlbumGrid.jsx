@@ -81,7 +81,7 @@ const AlbumGrid = ({ albums, loading, token }) => {
         {indianAlbums.map((album) => (
           <div
             key={album.id}
-            className="relative cursor-default rounded-md overflow-hidden transition-all duration-300 min-w-[150px] md:min-w-0 hover:scale-[1.02] hover:shadow-[0_0_10px_rgb(255,255,255,0.8)]"
+            className="relative cursor-default rounded-md overflow-hidden transition-all duration-300 min-w-[150px] md:min-w-0 hover:scale-[1.02]"
             onClick={() => getContent(album.href)}
           >
             <div className="w-full">

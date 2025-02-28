@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Library, Search, User, Settings, LogOut } from "lucide-react";
-import { Play, Pause, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, X } from "lucide-react";
+import { Grip, GripVertical } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
@@ -15,6 +16,25 @@ import { onAuthStateChanged } from "firebase/auth";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGlobalContext } from "./GlobalContext";
 import SearchPage from "./pages/SearchPage";
+import {
+  DndContext,
+  closestCenter,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  TouchSensor,
+  DragOverlay,
+  pointerWithin,
+  defaultDropAnimationSideEffects,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -138,21 +158,29 @@ const Player = () => {
   const { urlPlay, setUrlPlay } = useGlobalContext();
   const { queueState, setQueueState } = useGlobalContext();
   const audioRef = useRef(null);
+  const playerRef = useRef(null);
+  const queueRef = useRef(null);
 
   // Local states
-  const [volume, setVolume] = useState(50);
+  const [volume, setVolume] = useState(100);
   const [progress, setProgress] = useState(0);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [user, setUser] = useState(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [activeId, setActiveId] = useState(null);
 
   const saveCurrentQueue = async (userId, currentQueue) => {
     if (!userId || !initialLoadComplete) {
       return;
     }
     if (currentQueue && currentQueue.length > 0) {
-      await setDoc(doc(db, "users", userId), { savedQueue: currentQueue }, { merge: true });
+      await setDoc(
+        doc(db, "users", userId),
+        { savedQueue: currentQueue },
+        { merge: true }
+      );
     }
   };
 
@@ -160,8 +188,10 @@ const Player = () => {
     if (!userId) {
       return [];
     }
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    return userDoc.exists() && userDoc.data().savedQueue ? userDoc.data().savedQueue : [];
+    const userDoc = await getDoc(doc(db, "users", userId));
+    return userDoc.exists() && userDoc.data().savedQueue
+      ? userDoc.data().savedQueue
+      : [];
   };
 
   useEffect(() => {
@@ -173,8 +203,7 @@ const Player = () => {
           setQueue(saved);
         }
         setInitialLoadComplete(true); // Mark initial load as complete after fetching saved queue
-      }
-      else {
+      } else {
         setUser(null);
         setQueue([]);
         setInitialLoadComplete(false);
@@ -185,7 +214,8 @@ const Player = () => {
   }, []);
 
   useEffect(() => {
-    if (user && initialLoadComplete) { // Only save if initial load is complete
+    if (user && initialLoadComplete) {
+      // Only save if initial load is complete
       saveCurrentQueue(user.uid, queue);
     }
   }, [queue, user, initialLoadComplete]);
@@ -226,20 +256,28 @@ const Player = () => {
     }
     const artwork = [];
     if (urlPlay?.image?.[2]?.url) {
-      artwork.push({ src: urlPlay.image[2].url, sizes: "96x96", type: "image/jpeg" });
+      artwork.push({
+        src: urlPlay.image[2].url,
+        sizes: "96x96",
+        type: "image/jpeg",
+      });
     }
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack || "Unknown Track",
-      artist: urlPlay?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist",
+      artist:
+        urlPlay?.artists?.primary?.map((artist) => artist.name).join(", ") ||
+        "Unknown Artist",
       album: urlPlay?.album?.name || "Unknown Album",
-      artwork: artwork.length ? artwork : [{ src: "/default-cover.jpg", sizes: "96x96", type: "image/jpeg" }] 
+      artwork: artwork.length
+        ? artwork
+        : [{ src: "/default-cover.jpg", sizes: "96x96", type: "image/jpeg" }],
     });
 
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
 
     navigator.mediaSession.setActionHandler("play", () => {
-      audioRef.current?.play().catch(e => console.error("Play failed: ", e));
+      audioRef.current?.play().catch((e) => console.error("Play failed: ", e));
     });
 
     navigator.mediaSession.setActionHandler("pause", () => {
@@ -248,25 +286,26 @@ const Player = () => {
 
     navigator.mediaSession.setActionHandler("previoustrack", handlePrevious);
     navigator.mediaSession.setActionHandler("nexttrack", handleNext);
-
   }, [currentTrack, urlPlay, isPlaying]);
 
-// update the page title when the current track changes
-useEffect(() => {
-  if (currentTrack && urlPlay) {
-    const artistName = urlPlay?.artists?.primary?.map(artist => artist.name).join(", ") || "Unknown Artist";
+  // update the page title when the current track changes
+  useEffect(() => {
+    if (currentTrack && urlPlay) {
+      const artistName =
+        urlPlay?.artists?.primary?.map((artist) => artist.name).join(", ") ||
+        "Unknown Artist";
 
-    if (isPlaying) {
-      document.title = `♫ ${currentTrack} - ${artistName}`;
-    } else {
-      document.title = `♫ ${currentTrack} - ${artistName}`;
+      if (isPlaying) {
+        document.title = `♫ ${currentTrack} - ${artistName}`;
+      } else {
+        document.title = `▶ ${currentTrack} - ${artistName}`;
+      }
+
+      return () => {
+        document.title = "Boomify";
+      };
     }
-    
-    return () => {
-      document.title = "Boomify"; 
-    };
-  }
-}, [currentTrack, urlPlay, isPlaying]);
+  }, [currentTrack, urlPlay, isPlaying]);
 
   // Update queue when trackList changes
   useEffect(() => {
@@ -448,103 +487,415 @@ useEffect(() => {
     return () => audio.removeEventListener("timeupdate", updateProgress);
   }, []);
 
+  // Handle player click to show queue
+  const handlePlayerClick = (e) => {
+    // Don't show queue if clicking on buttons or controls
+    if (
+      e.target.closest("button") ||
+      e.target.closest("input") ||
+      e.target.tagName === "INPUT"
+    ) {
+      return;
+    }
+
+    setShowQueue(true);
+  };
+
+  // Handle clicks outside the queue overlay to close it
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        showQueue &&
+        queueRef.current &&
+        !queueRef.current.contains(e.target) &&
+        !playerRef.current.contains(e.target)
+      ) {
+        setShowQueue(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showQueue]);
+
+  // Function to change track from queue
+  const changeTrack = (index) => {
+    loadTrack(index);
+    setShowQueue(false);
+  };
+
+  // DND-Kit functions for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 10,
+      },
+    })
+  );
+
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const oldIndex = active.id;
+      const newIndex = over.id;
+
+      setQueue((items) => {
+        const newArray = [...items];
+        const [removed] = newArray.splice(oldIndex, 1);
+        newArray.splice(newIndex, 0, removed);
+
+        // Update currentIndex if the currently playing track was moved
+        if (currentIndex === oldIndex) {
+          setCurrentIndex(newIndex);
+        } else if (currentIndex > oldIndex && currentIndex <= newIndex) {
+          setCurrentIndex(currentIndex - 1);
+        } else if (currentIndex < oldIndex && currentIndex >= newIndex) {
+          setCurrentIndex(currentIndex + 1);
+        }
+
+        return newArray;
+      });
+    }
+
+    setActiveId(null);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
   const currentTrackInfo = urlPlay ?? { name: "No track selected" };
   const highQualityUrl =
     currentTrackInfo?.downloadUrl?.find((item) => item.quality === "320kbps")
       ?.url || "";
 
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-lg bg-gray-900/80 backdrop-blur-lg rounded-2xl shadow-lg flex items-center justify-between px-4 py-3">
-      {/* Track Info */}
-      <div className="flex items-center space-x-3 min-w-0">
-        {currentTrackInfo?.image?.[2]?.url ? (
-          <img
-            src={currentTrackInfo.image[2].url}
-            className={`h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500 transition ${
-              isPlaying ? "pulse-glow" : ""
-            }`}
-            alt="Track artwork"
-          />
-        ) : (
-          <div className="h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500" />
-        )}
-        <div className="min-w-0 flex-shrink">
-          <TrackInfo
-            currentTrackInfo={currentTrackInfo}
-            currentTrack={currentTrackInfo}
-          />
+    <>
+      {/* Main Player with Integrated Queue */}
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-lg">
+        {/* Queue Overlay */}
+        <AnimatePresence>
+          {showQueue && (
+            <motion.div
+              ref={queueRef}
+              initial={{ y: "100%", opacity: 0, height: 0 }}
+              animate={{ y: 0, opacity: 1, height: "auto" }}
+              exit={{ y: "100%", opacity: 0, height: 0 }}
+              transition={{ type: "spring", stiffness: 100, damping: 20 }}
+              className="w-full bg-gray-900/80 backdrop-blur-lg rounded-t-xl shadow-lg flex flex-col overflow-hidden max-h-[60vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Queue Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                <h3 className="font-bold text-xl text-white">Playing Queue</h3>
+                <div className="flex items-center">
+                  <Grip className="h-5 w-5 text-gray-400 mr-3" />
+                  <button
+                    onClick={() => setShowQueue(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Queue List with DND-Kit */}
+              <motion.div
+                className="flex-1 overflow-y-auto"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                style={{ transform: "none" }}
+              >
+                {queue.length > 0 ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                  >
+                    <SortableContext
+                      items={queue.map((_, index) => index)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {queue.map((trackName, index) => (
+                        <SortableTrackItem
+                          key={index}
+                          id={index}
+                          trackName={trackName}
+                          index={index}
+                          currentIndex={currentIndex}
+                          urlPlay={urlPlay}
+                          isPlaying={isPlaying}
+                          changeTrack={changeTrack}
+                        />
+                      ))}
+                    </SortableContext>
+
+                    {/* Drag Overlay for preview that follows the cursor */}
+                    <DragOverlay
+                      adjustScale={true}
+                      zIndex={100}
+                      coordinateGetter={pointerWithin}
+                      dropAnimation={defaultDropAnimationSideEffects}
+                    >
+                      {activeId !== null ? (
+                        <TrackItemPreview
+                          trackName={queue[activeId]}
+                          index={activeId}
+                          currentIndex={currentIndex}
+                          urlPlay={urlPlay}
+                          isPlaying={isPlaying}
+                        />
+                      ) : null}
+                    </DragOverlay>
+                  </DndContext>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <p>Your queue is empty</p>
+                    <p className="text-sm mt-2">Search and add songs to play</p>
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Player */}
+        <div
+          ref={playerRef}
+          onClick={handlePlayerClick}
+          className={`w-full bg-gray-900/80 backdrop-blur-lg shadow-lg flex items-center justify-between px-4 py-3 cursor-pointer ${
+            showQueue ? "rounded-b-2xl" : "rounded-2xl"
+          }`}
+        >
+          {/* Track Info */}
+          <div className="flex items-center space-x-3 min-w-0">
+            {currentTrackInfo?.image?.[2]?.url ? (
+              <img
+                src={currentTrackInfo.image[2].url}
+                className={`h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500 transition ${
+                  isPlaying ? "pulse-glow" : ""
+                }`}
+                alt="Track artwork"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-lg bg-gradient-to-b from-gray-700 to-gray-500" />
+            )}
+            <div className="min-w-0 flex-shrink">
+              <TrackInfo
+                currentTrackInfo={currentTrackInfo}
+                currentTrack={currentTrack}
+              />
+            </div>
+          </div>
+
+          <audio ref={audioRef} src={highQualityUrl} preload="auto" autoPlay />
+
+          {/* Controls */}
+          <div className="flex items-center space-x-4">
+            <button
+              className="text-gray-300 hover:text-white transition"
+              onClick={handlePrevious}
+              disabled={currentIndex === 0}
+            >
+              <SkipBack className="h-5 w-5" />
+            </button>
+            <button
+              className="bg-white text-black p-2 rounded-full hover:scale-105 transition"
+              onClick={handlePlayPause}
+            >
+              {isPlaying ? (
+                <Pause className="h-5 w-5" />
+              ) : (
+                <Play className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              className="text-gray-300 hover:text-white transition"
+              onClick={handleNext}
+              disabled={currentIndex === queue.length - 1}
+            >
+              <SkipForward className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Volume - Hidden on mobile */}
+          <div className="hidden md:flex items-center space-x-2">
+            <Volume2 className="h-5 w-5 text-gray-300" />
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => {
+                const newVolume = parseInt(e.target.value) / 100;
+                if (audioRef.current) audioRef.current.volume = newVolume;
+                setVolume(parseInt(e.target.value));
+              }}
+              className="w-16 h-[4px] bg-gray-500 rounded-lg"
+            />
+          </div>
+
+          {/* Progress Bar */}
+          <div
+            className={`absolute bottom-0 left-1 w-[calc(100%-7px)] h-1 bg-gray-700 rounded-b-2xl overflow-hidden 
+                      transition-opacity duration-500 ease-in-out transform 
+                      ${
+                        isPlaying
+                          ? "opacity-100 translate-y-0"
+                          : "opacity-0 translate-y-0"
+                      }`}
+          >
+            <div
+              className="h-full bg-blue-400 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+
+          {/* Error Display */}
+          {errorPlaying && (
+            <div className="absolute top-0 left-0 w-full text-red-500 text-xs text-center -mt-6">
+              {errorPlaying}
+            </div>
+          )}
         </div>
       </div>
+    </>
+  );
+};
 
-      <audio ref={audioRef} src={highQualityUrl} preload="auto" autoPlay />
+// SortableTrackItem component for drag and drop
+const SortableTrackItem = ({
+  id,
+  trackName,
+  index,
+  currentIndex,
+  urlPlay,
+  isPlaying,
+  changeTrack,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
 
-      {/* Controls */}
-      <div className="flex items-center space-x-4">
-        <button
-          className="text-gray-300 hover:text-white transition"
-          onClick={handlePrevious}
-          disabled={currentIndex === 0}
-        >
-          <SkipBack className="h-5 w-5" />
-        </button>
-        <button
-          className="bg-white text-black p-2 rounded-full hover:scale-105 transition"
-          onClick={handlePlayPause}
-        >
-          {isPlaying ? (
-            <Pause className="h-5 w-5" />
-          ) : (
-            <Play className="h-5 w-5" />
-          )}
-        </button>
-        <button
-          className="text-gray-300 hover:text-white transition"
-          onClick={handleNext}
-          disabled={currentIndex === queue.length - 1}
-        >
-          <SkipForward className="h-5 w-5" />
-        </button>
-      </div>
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.3 : 1, // Make original item more transparent while dragging
+  };
 
-      {/* Volume - Hidden on mobile */}
-      <div className="hidden md:flex items-center space-x-2">
-        <Volume2 className="h-5 w-5 text-gray-300" />
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={volume}
-          onChange={(e) => {
-            const newVolume = parseInt(e.target.value) / 100;
-            if (audioRef.current) audioRef.current.volume = newVolume;
-            setVolume(parseInt(e.target.value));
-          }}
-          className="w-16 h-[4px] bg-gray-500 rounded-lg"
-        />
-      </div>
-
-      {/* Progress Bar */}
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center space-x-3 px-6 py-3 hover:bg-gray-800 transition ${
+        index === currentIndex ? "bg-gray-800/50" : ""
+      } ${isDragging ? "bg-gray-700/30" : ""}`}
+    >
       <div
-        className={`absolute bottom-0 left-1 w-[calc(100%-7px)] h-1 bg-gray-700 rounded-b-2xl overflow-hidden 
-            transition-opacity duration-500 ease-in-out transform 
-            ${
-              isPlaying
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-0"
-            }`}
+        {...listeners}
+        {...attributes}
+        className="text-gray-400 cursor-grab active:cursor-grabbing"
       >
-        <div
-          className="h-full bg-blue-400 transition-all"
-          style={{ width: `${progress}%` }}
-        />
+        <GripVertical className="h-4 w-4" />
       </div>
 
-      {/* Error Display */}
-      {errorPlaying && (
-        <div className="absolute top-0 left-0 w-full text-red-500 text-xs text-center -mt-6">
-          {errorPlaying}
+      <div className="text-sm text-gray-400 w-6 text-center">{index + 1}</div>
+
+      {index === currentIndex && urlPlay?.image?.[2]?.url ? (
+        <img
+          src={urlPlay.image[2].url}
+          className={`h-10 w-10 rounded bg-gray-700 transition-all ${
+            isPlaying ? "shadow-lg shadow-blue-500/50" : ""
+          }`}
+          alt="Track artwork"
+        />
+      ) : (
+        <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+          <Play className="h-4 w-4 text-gray-500" />
         </div>
       )}
+
+      <div
+        className="flex-1 min-w-0 cursor-pointer"
+        onClick={() => !isDragging && changeTrack(index)}
+      >
+        <div className="text-white font-medium truncate">{trackName}</div>
+        {index === currentIndex && (
+          <div className="text-blue-400 text-sm">
+            {isPlaying ? "Playing" : "Paused"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const TrackItemPreview = ({
+  trackName,
+  index,
+  currentIndex,
+  urlPlay,
+  isPlaying,
+}) => {
+  return (
+    <div
+      className={`flex items-center space-x-3 px-6 py-3 bg-gray-800 shadow-lg rounded border border-blue-500 ${
+        index === currentIndex ? "bg-gray-700" : "bg-gray-800"
+      }`}
+      style={{
+        width: "90%",
+        transform: "translate(-500px, -200px)", // Shift 10px right & 10px down
+      }}
+    >
+      <div className="text-gray-400">
+        <GripVertical className="h-4 w-4" />
+      </div>
+
+      <div className="text-sm text-gray-400 w-6 text-center">{index + 1}</div>
+
+      {index === currentIndex && urlPlay?.image?.[2]?.url ? (
+        <img
+          src={urlPlay.image[2].url}
+          className={`h-10 w-10 rounded bg-gray-700 transition-all ${
+            isPlaying ? "shadow-lg shadow-blue-500/50" : ""
+          }`}
+          alt="Track artwork"
+        />
+      ) : (
+        <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+          <Play className="h-4 w-4 text-gray-500" />
+        </div>
+      )}
+
+      <div className="flex-1 min-w-0">
+        <div className="text-white font-medium truncate">{trackName}</div>
+        {index === currentIndex && (
+          <div className="text-blue-400 text-sm">
+            {isPlaying ? "Playing" : "Paused"}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

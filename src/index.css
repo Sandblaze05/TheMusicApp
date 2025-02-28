@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@tailwind base;
 @tailwind utilities;
 
 @layer base {
@@ -55,5 +54,5 @@
 }
 
 body {
-  @apply min-h-screen bg-gray-950 overflow-x-hidden
+  @apply min-h-screen bg-gray-900 overflow-x-hidden
 }
