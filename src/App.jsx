@@ -13,7 +13,7 @@ import SignUp from "./pages/SignUp";
 import TrackInfo from "./components/TrackInfo";
 import { auth, db, doc, setDoc, getDoc } from "./firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, hover, motion } from "framer-motion";
 import { useGlobalContext } from "./GlobalContext";
 import SearchPage from "./pages/SearchPage";
 import {
@@ -171,14 +171,14 @@ const Player = () => {
   const [showQueue, setShowQueue] = useState(false);
   const [activeId, setActiveId] = useState(null);
 
-  const saveCurrentQueue = async (userId, currentQueue) => {
+  const saveCurrentQueue = async (userId, currentQueue, currentIndex) => {
     if (!userId || !initialLoadComplete) {
       return;
     }
     if (currentQueue && currentQueue.length > 0) {
       await setDoc(
         doc(db, "users", userId),
-        { savedQueue: currentQueue },
+        { savedQueue: currentQueue, savedIndex: currentIndex },
         { merge: true }
       );
     }
@@ -189,9 +189,12 @@ const Player = () => {
       return [];
     }
     const userDoc = await getDoc(doc(db, "users", userId));
-    return userDoc.exists() && userDoc.data().savedQueue
-      ? userDoc.data().savedQueue
-      : [];
+    return userDoc.exists()
+      ? {
+        queue: userDoc.data().savedQueue || [],
+        index: userDoc.data().savedIndex !== undefined ? userDoc.data().savedIndex : 0,
+      }
+      : { queue: [], index: 0 };
   };
 
   useEffect(() => {
@@ -199,12 +202,14 @@ const Player = () => {
       if (user) {
         setUser(user);
         const saved = await getSavedQueue(user.uid);
-        if (saved && saved.length > 0) {
-          setQueue(saved);
+        if (saved.queue.length > 0) {
+          setQueue(saved.queue);
+          setCurrentIndex(saved.index);
         }
         setInitialLoadComplete(true); // Mark initial load as complete after fetching saved queue
       } else {
         setUser(null);
+        setCurrentIndex(0);
         setQueue([]);
         setInitialLoadComplete(false);
       }
@@ -216,9 +221,9 @@ const Player = () => {
   useEffect(() => {
     if (user && initialLoadComplete) {
       // Only save if initial load is complete
-      saveCurrentQueue(user.uid, queue);
+      saveCurrentQueue(user.uid, queue, currentIndex);
     }
-  }, [queue, user, initialLoadComplete]);
+  }, [queue, user, initialLoadComplete, currentIndex]);
 
   // Add event listeners to sync audio state
   useEffect(() => {
@@ -427,8 +432,11 @@ const Player = () => {
   }, [volume]);
 
   useEffect(() => {
-    if (queue.length > 0 && !currentTrack) {
+    if (queue.length > 0 && !currentTrack && !currentIndex) {
       loadTrack(0);
+    }
+    else if (currentIndex && queue.length > currentIndex) {
+      loadTrack(currentIndex);
     }
   }, [queue, currentTrack, loadTrack]);
 
@@ -575,6 +583,16 @@ const Player = () => {
     setActiveId(null);
   };
 
+  const moveTrack = (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= queue.length) return; // Prevent out-of-bounds
+
+    // Simulate a drag event and call handleDragEnd
+    handleDragEnd({
+      active: { id: fromIndex },
+      over: { id: toIndex },
+    });
+  };
+
   const currentTrackInfo = urlPlay ?? { name: "No track selected" };
   const highQualityUrl =
     currentTrackInfo?.downloadUrl?.find((item) => item.quality === "320kbps")
@@ -610,7 +628,7 @@ const Player = () => {
                 </div>
               </div>
 
-              {/* Queue List with DND-Kit */}
+              {/* Queue List */}
               <motion.div
                 className="flex-1 overflow-y-auto"
                 initial={{ opacity: 0 }}
@@ -641,6 +659,9 @@ const Player = () => {
                           urlPlay={urlPlay}
                           isPlaying={isPlaying}
                           changeTrack={changeTrack}
+                          moveTrack={moveTrack}
+                          isFirst={index === 0}
+                          isLast={index === queue.length - 1}
                         />
                       ))}
                     </SortableContext>
@@ -787,6 +808,9 @@ const SortableTrackItem = ({
   urlPlay,
   isPlaying,
   changeTrack,
+  moveTrack,
+  isFirst, // Received from parent
+  isLast, // Received from parent
 }) => {
   const {
     attributes,
@@ -812,6 +836,7 @@ const SortableTrackItem = ({
         index === currentIndex ? "bg-gray-800/50" : ""
       } ${isDragging ? "bg-gray-700/30" : ""}`}
     >
+      {/* Drag Handle */}
       <div
         {...listeners}
         {...attributes}
@@ -820,8 +845,10 @@ const SortableTrackItem = ({
         <GripVertical className="h-4 w-4" />
       </div>
 
+      {/* Track Index */}
       <div className="text-sm text-gray-400 w-6 text-center">{index + 1}</div>
 
+      {/* Track Image or Play Icon */}
       {index === currentIndex && urlPlay?.image?.[2]?.url ? (
         <img
           src={urlPlay.image[2].url}
@@ -836,6 +863,7 @@ const SortableTrackItem = ({
         </div>
       )}
 
+      {/* Track Name */}
       <div
         className="flex-1 min-w-0 cursor-pointer"
         onClick={() => !isDragging && changeTrack(index)}
@@ -845,6 +873,28 @@ const SortableTrackItem = ({
           <div className="text-blue-400 text-sm">
             {isPlaying ? "Playing" : "Paused"}
           </div>
+        )}
+      </div>
+
+      {/* Up/Down Buttons */}
+      <div className="flex flex-col space-y-1">
+        {!isFirst && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => moveTrack(index, index - 1)}
+            className="text-gray-400 hover:text-white"
+          >
+            ▲
+          </motion.button>
+        )}
+        {!isLast && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => moveTrack(index, index + 1)}
+            className="text-gray-400 hover:text-white"
+          >
+            ▼
+          </motion.button>
         )}
       </div>
     </div>
