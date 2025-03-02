@@ -16,21 +16,18 @@ import { onAuthStateChanged } from "firebase/auth";
 import { AnimatePresence, hover, motion } from "framer-motion";
 import { useGlobalContext } from "./GlobalContext";
 import SearchPage from "./pages/SearchPage";
+import SeekableProgressBar from "./components/SeekableProgressBar";
+import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import {
   DndContext,
   closestCenter,
   useSensor,
   useSensors,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
-  DragOverlay,
-  pointerWithin,
-  defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -191,9 +188,12 @@ const Player = () => {
     const userDoc = await getDoc(doc(db, "users", userId));
     return userDoc.exists()
       ? {
-        queue: userDoc.data().savedQueue || [],
-        index: userDoc.data().savedIndex !== undefined ? userDoc.data().savedIndex : 0,
-      }
+          queue: userDoc.data().savedQueue || [],
+          index:
+            userDoc.data().savedIndex !== undefined
+              ? userDoc.data().savedIndex
+              : 0,
+        }
       : { queue: [], index: 0 };
   };
 
@@ -434,8 +434,7 @@ const Player = () => {
   useEffect(() => {
     if (queue.length > 0 && !currentTrack && !currentIndex) {
       loadTrack(0);
-    }
-    else if (currentIndex && queue.length > currentIndex) {
+    } else if (currentIndex && queue.length > currentIndex) {
       loadTrack(currentIndex);
     }
   }, [queue, currentTrack, loadTrack]);
@@ -479,6 +478,14 @@ const Player = () => {
     if (currentIndex < queue.length - 1) {
       loadTrack(currentIndex + 1);
     }
+  };
+
+  const handleSeek = (newProgress) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime =
+        (audioRef.current.duration * newProgress) / 100;
+    }
+    setProgress(newProgress);
   };
 
   // Update progress based on actual audio time
@@ -534,15 +541,15 @@ const Player = () => {
 
   // DND-Kit functions for drag and drop
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 10,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 150,
-        tolerance: 10,
+        delay: 100,
+        tolerance: 5,
       },
     })
   );
@@ -583,16 +590,6 @@ const Player = () => {
     setActiveId(null);
   };
 
-  const moveTrack = (fromIndex, toIndex) => {
-    if (toIndex < 0 || toIndex >= queue.length) return; // Prevent out-of-bounds
-
-    // Simulate a drag event and call handleDragEnd
-    handleDragEnd({
-      active: { id: fromIndex },
-      over: { id: toIndex },
-    });
-  };
-
   const currentTrackInfo = urlPlay ?? { name: "No track selected" };
   const highQualityUrl =
     currentTrackInfo?.downloadUrl?.find((item) => item.quality === "320kbps")
@@ -611,7 +608,7 @@ const Player = () => {
               animate={{ y: 0, opacity: 1, height: "auto" }}
               exit={{ y: "100%", opacity: 0, height: 0 }}
               transition={{ type: "spring", stiffness: 100, damping: 20 }}
-              className="w-full bg-gray-900/80 backdrop-blur-lg rounded-t-xl shadow-lg flex flex-col overflow-hidden max-h-[60vh]"
+              className="w-full bg-gray-950/80 backdrop-blur-lg rounded-t-xl shadow-lg flex flex-col overflow-hidden max-h-[60vh]"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Queue Header */}
@@ -644,6 +641,7 @@ const Player = () => {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}
+                    modifiers={[restrictToFirstScrollableAncestor]}
                   >
                     <SortableContext
                       items={queue.map((_, index) => index)}
@@ -659,30 +657,9 @@ const Player = () => {
                           urlPlay={urlPlay}
                           isPlaying={isPlaying}
                           changeTrack={changeTrack}
-                          moveTrack={moveTrack}
-                          isFirst={index === 0}
-                          isLast={index === queue.length - 1}
                         />
                       ))}
                     </SortableContext>
-
-                    {/* Drag Overlay for preview that follows the cursor */}
-                    <DragOverlay
-                      adjustScale={true}
-                      zIndex={100}
-                      coordinateGetter={pointerWithin}
-                      dropAnimation={defaultDropAnimationSideEffects}
-                    >
-                      {activeId !== null ? (
-                        <TrackItemPreview
-                          trackName={queue[activeId]}
-                          index={activeId}
-                          currentIndex={currentIndex}
-                          urlPlay={urlPlay}
-                          isPlaying={isPlaying}
-                        />
-                      ) : null}
-                    </DragOverlay>
                   </DndContext>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -699,7 +676,7 @@ const Player = () => {
         <div
           ref={playerRef}
           onClick={handlePlayerClick}
-          className={`w-full bg-gray-900/80 backdrop-blur-lg shadow-lg flex items-center justify-between px-4 py-3 cursor-pointer ${
+          className={`w-full bg-gray-950/80 backdrop-blur-lg shadow-lg flex items-center justify-between px-4 py-3 cursor-pointer ${
             showQueue ? "rounded-b-2xl" : "rounded-2xl"
           }`}
         >
@@ -728,30 +705,45 @@ const Player = () => {
 
           {/* Controls */}
           <div className="flex items-center space-x-4">
-            <button
+            {/* Previous Button */}
+            <motion.button
               className="text-gray-300 hover:text-white transition"
               onClick={handlePrevious}
               disabled={currentIndex === 0}
+              whileTap={{ x: -5 }} // Moves left slightly
+              whileHover={{ scale: 1.1 }}
+              animate={{ opacity: currentIndex === 0 ? 0.5 : 1 }}
             >
               <SkipBack className="h-5 w-5" />
-            </button>
-            <button
-              className="bg-white text-black p-2 rounded-full hover:scale-105 transition"
+            </motion.button>
+
+            {/* Play/Pause Button */}
+            <motion.button
+              className="bg-white text-black p-2 rounded-full transition"
               onClick={handlePlayPause}
+              whileTap={{ scale: 0.75 }} // Shrink on press
+              animate={{ scale: 1 }} // Default scale
+              whileHover={{ scale: 1.1 }} // Slight bounce after release
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
             >
               {isPlaying ? (
                 <Pause className="h-5 w-5" />
               ) : (
                 <Play className="h-5 w-5" />
               )}
-            </button>
-            <button
+            </motion.button>
+
+            {/* Next Button */}
+            <motion.button
               className="text-gray-300 hover:text-white transition"
               onClick={handleNext}
               disabled={currentIndex === queue.length - 1}
+              whileTap={{ x: 5 }} // Moves right slightly
+              whileHover={{ scale: 1.1 }}
+              animate={{ opacity: currentIndex === queue.length - 1 ? 0.5 : 1 }}
             >
               <SkipForward className="h-5 w-5" />
-            </button>
+            </motion.button>
           </div>
 
           {/* Volume - Hidden on mobile */}
@@ -772,20 +764,12 @@ const Player = () => {
           </div>
 
           {/* Progress Bar */}
-          <div
-            className={`absolute bottom-0 left-1 w-[calc(100%-7px)] h-1 bg-gray-700 rounded-b-2xl overflow-hidden 
-                      transition-opacity duration-500 ease-in-out transform 
-                      ${
-                        isPlaying
-                          ? "opacity-100 translate-y-0"
-                          : "opacity-0 translate-y-0"
-                      }`}
-          >
-            <div
-              className="h-full bg-blue-400 transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          <SeekableProgressBar
+            progress={progress}
+            onSeek={handleSeek}
+            currentTime={audioRef.current?.currentTime}
+            duration={audioRef.current?.duration}
+          />
 
           {/* Error Display */}
           {errorPlaying && (
@@ -808,9 +792,6 @@ const SortableTrackItem = ({
   urlPlay,
   isPlaying,
   changeTrack,
-  moveTrack,
-  isFirst, // Received from parent
-  isLast, // Received from parent
 }) => {
   const {
     attributes,
@@ -868,77 +849,6 @@ const SortableTrackItem = ({
         className="flex-1 min-w-0 cursor-pointer"
         onClick={() => !isDragging && changeTrack(index)}
       >
-        <div className="text-white font-medium truncate">{trackName}</div>
-        {index === currentIndex && (
-          <div className="text-blue-400 text-sm">
-            {isPlaying ? "Playing" : "Paused"}
-          </div>
-        )}
-      </div>
-
-      {/* Up/Down Buttons */}
-      <div className="flex flex-col space-y-1">
-        {!isFirst && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => moveTrack(index, index - 1)}
-            className="text-gray-400 hover:text-white"
-          >
-            ▲
-          </motion.button>
-        )}
-        {!isLast && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => moveTrack(index, index + 1)}
-            className="text-gray-400 hover:text-white"
-          >
-            ▼
-          </motion.button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const TrackItemPreview = ({
-  trackName,
-  index,
-  currentIndex,
-  urlPlay,
-  isPlaying,
-}) => {
-  return (
-    <div
-      className={`flex items-center space-x-3 px-6 py-3 bg-gray-800 shadow-lg rounded border border-blue-500 ${
-        index === currentIndex ? "bg-gray-700" : "bg-gray-800"
-      }`}
-      style={{
-        width: "90%",
-        transform: "translate(-500px, -200px)", // Shift 10px right & 10px down
-      }}
-    >
-      <div className="text-gray-400">
-        <GripVertical className="h-4 w-4" />
-      </div>
-
-      <div className="text-sm text-gray-400 w-6 text-center">{index + 1}</div>
-
-      {index === currentIndex && urlPlay?.image?.[2]?.url ? (
-        <img
-          src={urlPlay.image[2].url}
-          className={`h-10 w-10 rounded bg-gray-700 transition-all ${
-            isPlaying ? "shadow-lg shadow-blue-500/50" : ""
-          }`}
-          alt="Track artwork"
-        />
-      ) : (
-        <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
-          <Play className="h-4 w-4 text-gray-500" />
-        </div>
-      )}
-
-      <div className="flex-1 min-w-0">
         <div className="text-white font-medium truncate">{trackName}</div>
         {index === currentIndex && (
           <div className="text-blue-400 text-sm">

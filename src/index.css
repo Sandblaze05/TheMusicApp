@@ -51,6 +51,22 @@
   .animate-pulse-slow {
     animation: pulse-slow 5s infinite ease-in-out;
   }
+
+  @keyframes pulse {
+    0% {
+      box-shadow: -5px -5px 15px rgba(255, 182, 193, 0.5);
+    }
+    50% {
+      box-shadow: -10px -10px 20px rgba(255, 182, 193, 0.7);
+    }
+    100% {
+      box-shadow: -5px -5px 15px rgba(255, 182, 193, 0.5);
+    }
+  }
+
+  .pulse-effect {
+    animation: pulse 1.5s infinite ease-in-out;
+  }
 }
 
 body {
