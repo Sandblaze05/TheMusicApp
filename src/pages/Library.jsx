@@ -19,7 +19,19 @@ const LibraryPage = () => {
   const [loading, setLoading] = useState(false);
 
   const spotifyToken = async () => {
-    console.log("getting token");
+    console.log("Getting token");
+
+    const storedToken = localStorage.getItem("spotify_token");
+    const storedExpiry = localStorage.getItem("spotify_token_expiry");
+
+    // Check if token is still valid
+    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry)) {
+      console.log("Using stored token");
+      setToken(storedToken);
+      console.log(storedToken);
+      return;
+    }
+
     const authOptions = {
       method: "POST",
       headers: {
@@ -48,32 +60,44 @@ const LibraryPage = () => {
         );
       }
 
-      console.log(
-        "Token received:",
-        data.access_token ? "Token present" : "No token in response"
-      );
+      console.log("New token received");
       setToken(data.access_token);
+
+      // Store token and expiry (token expires in 3600 seconds = 1 hour)
+      localStorage.setItem("spotify_token", data.access_token);
+      localStorage.setItem(
+        "spotify_token_expiry",
+        Date.now() + data.expires_in * 1000
+      );
     } catch (err) {
-      const errorMessage = `Token fetch failed: ${err.message}`;
-      console.error(errorMessage);
-      setError(errorMessage);
+      console.error("Token fetch failed:", err.message);
+      setError(`Token fetch failed: ${err.message}`);
       setToken(null);
     }
   };
 
-  const getAlbums = async ( listOfId ) => {
+  const getAlbums = async (listOfId, overrideToken = null) => {
     setLoading(true);
     console.log("getting albums");
+    const tokenToUse = overrideToken || token;
+
+    if (!tokenToUse || listOfId.length === 0) {
+      console.log("No token or album IDs available, skipping fetch");
+      setLoading(false);
+      return;
+    }
     const authOptions = {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${tokenToUse}`,
       },
     };
 
     try {
       const response = await fetch(
-        `https://api.spotify.com/v1/albums?ids=${encodeURIComponent(listOfId.join(","))}&market=IN`,
+        `https://api.spotify.com/v1/albums?ids=${encodeURIComponent(
+          listOfId.join(",")
+        )}&market=IN`,
         authOptions
       );
       const data = await response.json();
@@ -111,8 +135,7 @@ const LibraryPage = () => {
         ...d.data(),
       }));
       return favorites.map((fav) => fav.id);
-    }
-    catch (err) {
+    } catch (err) {
       console.log("Error fetching favorites: ", err);
       return [];
     }
@@ -134,9 +157,15 @@ const LibraryPage = () => {
     const sequence = async () => {
       if (stableUser) {
         await spotifyToken();
+        const currentToken = localStorage.getItem("spotify_token");
         const out = await getFavorites();
         console.log(out);
-        getAlbums(out);
+        if (out.length > 0 && currentToken) {
+          getAlbums(out, currentToken);
+        }
+        if (out.length > 0 && !currentToken) {
+          getAlbums(out);
+        }
       }
     };
     sequence();
@@ -153,7 +182,11 @@ const LibraryPage = () => {
         >
           | Favorite Albums
         </motion.div>
-        <AlbumGridFav loading={loading} albums={userFavoriteAlbums} token={token} />
+        <AlbumGridFav
+          loading={loading}
+          albums={userFavoriteAlbums}
+          token={token}
+        />
       </div>
     </main>
   );
