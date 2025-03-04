@@ -67,6 +67,58 @@
   .pulse-effect {
     animation: pulse 1.5s infinite ease-in-out;
   }
+
+  .animate-gradient {
+    background: linear-gradient(
+      90deg,
+      #1e3a8a 0%,    /* blue-900 */
+      #5b21b6 33%,   /* purple-900 */
+      #db2777 67%,   /* pink-900 */
+      #1e3a8a 100%
+    );
+    background-size: 300% 300%;
+    animation: gradientPulse 6s ease infinite;
+  }
+  
+  @keyframes gradientPulse {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
+  .gradient-text {
+    background: linear-gradient(
+      90deg,
+      #aabbe9 0%,
+      #e7dfe6 33%,
+      #d6a7bc 67%,
+      #ef4267 100%
+    );
+    background-size: 300% 300%;
+    animation: gradientPulse 6s ease infinite;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  
+  @keyframes gradientPulse {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
 }
 
 body {

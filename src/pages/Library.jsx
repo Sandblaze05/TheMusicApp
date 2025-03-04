@@ -130,10 +130,12 @@ const LibraryPage = () => {
       const favoriteRef = collection(db, `users/${user.uid}/favorites`);
       const querySnapshot = await getDocs(favoriteRef);
 
-      const favorites = querySnapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
+      const favorites = querySnapshot.docs
+        .filter((d) => d.data().type === "album") // Only include albums
+        .map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
       return favorites.map((fav) => fav.id);
     } catch (err) {
       console.log("Error fetching favorites: ", err);
@@ -172,7 +174,11 @@ const LibraryPage = () => {
   }, [stableUser]);
 
   return (
-    <main className="min-h-screen p-4 mt-1 text-white text-3xl">
+    <main className="relative min-h-screen p-4 mt-1 text-white text-3xl overflow-hidden">
+      {/* Pulsing Gradient Background */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-3xl animate-pulse-slow"></div>
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl animate-pulse-slow"></div>
+
       <div>
         <motion.div
           initial={{ opacity: 0, y: 10 }}

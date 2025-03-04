@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { auth } from "../firebase/firebase";
+import { auth, db, doc, setDoc, getDoc } from "../firebase/firebase";
+import { deleteDoc } from "firebase/firestore";
 import { useGlobalContext } from "../GlobalContext";
-import { Play, Clock, Music } from "lucide-react";
-import { motion } from "framer-motion";
+import { Play, Clock, Music, List, Heart } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import AlbumPopup from "../components/AlbumPopup";
 
 const SearchPage = () => {
@@ -13,6 +14,7 @@ const SearchPage = () => {
   const { setTrackList, setQueueState } = useGlobalContext();
   const [user, setUser] = useState(null);
   const [result, setResult] = useState([]);
+  const stableResult = useMemo(() => result, [result]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [albumContent, setAlbumContent] = useState(null);
@@ -23,8 +25,25 @@ const SearchPage = () => {
     setTrackList([trackName]);
   };
 
+  const handleAddToQueue = (trackName) => {
+    setQueueState(true);
+    setTrackList([trackName]);
+  };
+
   const spotifyToken = async () => {
-    console.log("getting token");
+    console.log("Getting token");
+
+    const storedToken = localStorage.getItem("spotify_token");
+    const storedExpiry = localStorage.getItem("spotify_token_expiry");
+
+    // Check if token is still valid
+    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry)) {
+      console.log("Using stored token");
+      setToken(storedToken);
+      console.log(storedToken);
+      return;
+    }
+
     const authOptions = {
       method: "POST",
       headers: {
@@ -53,27 +72,30 @@ const SearchPage = () => {
         );
       }
 
-      console.log(
-        "Token received:",
-        data.access_token ? "Token present" : "No token in response"
-      );
+      console.log("New token received");
       setToken(data.access_token);
+
+      // Store token and expiry (token expires in 3600 seconds = 1 hour)
+      localStorage.setItem("spotify_token", data.access_token);
+      localStorage.setItem(
+        "spotify_token_expiry",
+        Date.now() + data.expires_in * 1000
+      );
     } catch (err) {
-      const errorMessage = `Token fetch failed: ${err.message}`;
-      console.error(errorMessage);
-      setError(errorMessage);
+      console.error("Token fetch failed:", err.message);
+      setError(`Token fetch failed: ${err.message}`);
       setToken(null);
     }
   };
 
-  const fetchQuery = async () => {
+  const fetchQuery = async (overrideToken = null) => {
     console.log(token);
     setLoading(true);
     try {
       const authOptions = {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${overrideToken || token}`,
         },
       };
       const response = await fetch(
@@ -129,11 +151,11 @@ const SearchPage = () => {
   };
 
   useEffect(() => {
-    spotifyToken();
-    if (token) {
-      fetchQuery();
-    }
-    // window.playTrackDirectly('Jugnu');
+    const sequence = async () => {
+        await spotifyToken();
+        fetchQuery();
+    };
+    sequence();
   }, []);
 
   useEffect(() => {
@@ -150,47 +172,134 @@ const SearchPage = () => {
 
   // Tracks Section
   const TracksSection = () => {
-    if (!result?.tracks?.items?.length) return null;
+    const [isFavorited, setIsFavorited] = useState({});
+
+    const checkIfFavorited = async (id) => {
+      if (!user) return;
+      const favoriteRef = doc(db, `users/${user.uid}/favorites`, id);
+      const docSnap = await getDoc(favoriteRef);
+      return docSnap.exists();
+    };
+
+    // Load initial favorite states for all tracks
+    useEffect(() => {
+      if (stableResult?.tracks?.items.length > 0 && user) {
+        const fetchFavorites = async () => {
+          const favoritesState = {};
+          for (const track of stableResult.tracks.items) {
+            const isFav = await checkIfFavorited(track.id);
+            favoritesState[track.id] = isFav;
+          }
+          setIsFavorited(favoritesState);
+        };
+        fetchFavorites();
+      }
+    }, [stableResult, user]);
+
+    const toggleFavorite = async (id, type) => {
+      if (!user) {
+        console.log("User didn't login");
+        return;
+      }
+      const favoriteRef = doc(db, `users/${user.uid}/favorites`, id);
+
+      try {
+        if (isFavorited[id]) {
+          await deleteDoc(favoriteRef);
+          console.log(`Removed ${type} ${id} from favorites`);
+        } else {
+          await setDoc(favoriteRef, { id, type, timestamp: Date.now() });
+          console.log(`Added ${type} ${id} to favorites`);
+        }
+
+        // Update state correctly by tracking each item separately
+        setIsFavorited((prev) => ({
+          ...prev,
+          [id]: !prev[id],
+        }));
+      } catch (error) {
+        console.error("Error toggling favorite:", error);
+      }
+    };
+
+    if (!stableResult?.tracks?.items?.length) return null;
 
     return (
       <div className="mb-8">
-        {/* {<h2 className="text-xl font-bold text-white mb-4">Songs</h2>} */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className=" py-4 px-0 w-fit text-3xl font-bold text-gray-100 hover:text-white glow"
+          className="py-4 px-0 w-fit text-3xl font-bold text-gray-100 hover:text-white glow"
         >
           | Songs
         </motion.div>
+    
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-lg overflow-hidden">
-          {result.tracks.items.map((track) => (
-            <div
-              key={track.id}
-              className="group flex items-center gap-4 p-3 hover:bg-gray-700/50 transition-colors duration-200 border-b border-gray-700/50 last:border-0"
-              onClick={() => handleSinglePlay(track.name)}
-            >
-              <div className="w-12 h-12 relative flex-shrink-0">
-                <img
-                  src={track.album?.images[0]?.url}
-                  alt={track.name}
-                  className="w-full h-full object-cover rounded"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="h-5 w-5 text-white" />
+          <AnimatePresence>
+            {stableResult.tracks.items.map((track, index) => (
+              <motion.div
+                key={track.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.5, ease: "easeOut", delay: index * 0.05 }} // Staggered animation
+                className="group flex items-center gap-4 p-3 hover:bg-gray-700/50 transition-colors duration-200 border-b border-gray-700/50 last:border-0"
+                onClick={() => handleSinglePlay(track.name)}
+              >
+                <div className="w-12 h-12 relative flex-shrink-0">
+                  <img
+                    src={track.album?.images[0]?.url}
+                    alt={track.name}
+                    className="w-full h-full object-cover rounded"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="h-5 w-5 text-white" />
+                  </div>
                 </div>
-              </div>
-              <div className="flex-grow min-w-0">
-                <p className="text-white truncate">{track.name}</p>
-                <p className="text-gray-400 text-sm truncate">
-                  {track.artists.map((a) => a.name).join(", ")}
-                </p>
-              </div>
-              <div className="text-gray-400 text-sm flex-shrink-0">
-                {formatDuration(track.duration_ms)}
-              </div>
-            </div>
-          ))}
+    
+                <div className="flex-grow min-w-0">
+                  <p className="text-white truncate">{track.name}</p>
+                  <p className="text-gray-400 text-sm truncate">
+                    {track.artists.map((a) => a.name).join(", ")}
+                  </p>
+                </div>
+    
+                {/* Buttons */}
+                <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddToQueue(track.name);
+                    }}
+                    className="p-2 rounded-3xl hover:bg-gray-600 transition-colors"
+                  >
+                    <List className="h-5 w-5 text-gray-300" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddToFav(track);
+                    }}
+                    className="p-2 rounded-3xl hover:bg-gray-600 transition-colors"
+                  >
+                    <Heart
+                      onClick={() => toggleFavorite(track.id, "Track")}
+                      className={`h-5 w-5 ${
+                        isFavorited[track.id]
+                          ? "fill-red-600 text-red-600"
+                          : "text-gray-300"
+                      }`}
+                    />
+                  </button>
+                </div>
+    
+                <div className="text-gray-400 text-sm flex-shrink-0">
+                  {formatDuration(track.duration_ms)}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       </div>
     );
@@ -239,7 +348,7 @@ const SearchPage = () => {
 
   // Albums Section
   const AlbumsSection = () => {
-    if (!result?.albums?.items?.length) return null;
+    if (!stableResult?.albums?.items?.length) return null;
 
     return (
       <div className="mb-8">
@@ -259,7 +368,7 @@ const SearchPage = () => {
           <div className="overflow-x-auto pb-4 -mb-4 scrollbar-hide">
             {/* Fixed width items in a flex row on mobile, grid on larger screens */}
             <div className="flex md:grid md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-4 min-w-max md:min-w-0">
-              {result.albums.items.map((album) => (
+              {stableResult.albums.items.map((album) => (
                 <div
                   key={album.id}
                   className="bg-gray-800/50 rounded-lg p-4 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-300 group relative w-36 flex-shrink-0 md:w-auto"

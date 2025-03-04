@@ -597,7 +597,7 @@ const Player = () => {
 
   return (
     <>
-      {/* Main Player with Integrated Queue */}
+      {/* Main Player */}
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-lg">
         {/* Queue Overlay */}
         <AnimatePresence>
@@ -721,10 +721,10 @@ const Player = () => {
             <motion.button
               className="bg-white text-black p-2 rounded-full transition"
               onClick={handlePlayPause}
-              whileTap={{ scale: 0.75 }} // Shrink on press
+              whileTap={{ scale: 0.9 }} // Shrink on press
               animate={{ scale: 1 }} // Default scale
               whileHover={{ scale: 1.1 }} // Slight bounce after release
-              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              transition={{ type: "spring", stiffness: 300, damping: 10 }}
             >
               {isPlaying ? (
                 <Pause className="h-5 w-5" />

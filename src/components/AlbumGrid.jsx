@@ -47,7 +47,7 @@ const AlbumGrid = ({ albums, loading, token }) => {
 
   if (loading) {
     return (
-      <div className="p-4">
+      <div className="p-2">
         <div className="flex md:grid md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 overflow-x-auto scrollbar-hide space-x-4 p-2">
           {Array.from({ length: 18 }).map((_, index) => (
             <div
