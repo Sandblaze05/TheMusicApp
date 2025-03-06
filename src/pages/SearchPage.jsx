@@ -279,7 +279,6 @@ const SearchPage = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAddToFav(track);
                     }}
                     className="p-2 rounded-3xl hover:bg-gray-600 transition-colors"
                   >

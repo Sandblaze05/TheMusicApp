@@ -8,15 +8,19 @@ import { useGlobalContext } from "../GlobalContext";
 import { collection, doc, getDocs } from "firebase/firestore";
 import AlbumGrid from "../components/AlbumGrid";
 import AlbumGridFav from "../components/AlbumGridFav";
+import FavoriteTracks from "../components/FavoriteTracks";
 
 const LibraryPage = () => {
   const navigate = useNavigate();
   const { token, setToken } = useGlobalContext();
   const [error, setError] = useState("");
+  const [errorTracks, setErrorTracks] = useState("");
   const [user, setUser] = useState(null);
   const stableUser = useMemo(() => user, [user]);
   const [userFavoriteAlbums, setUserFavoriteAlbums] = useState([]);
+  const [userFavoriteTracks, setUserFavoriteTracks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingTracks, setLoadingTracks] = useState(false);
 
   const spotifyToken = async () => {
     console.log("Getting token");
@@ -123,6 +127,53 @@ const LibraryPage = () => {
     }
   };
 
+  const getTracks = async (listOfId, overrideToken = null) => {
+    setLoadingTracks(true);
+    const tokenToUse = overrideToken || token;
+
+    if (!tokenToUse || listOfId.length === 0) {
+      console.log("No token or album IDs available, skipping fetch");
+      setLoading(false);
+      return;
+    }
+    const authOptions = {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${tokenToUse}`,
+      },
+    };
+    try {
+      const response = await fetch(
+        `https://api.spotify.com/v1/tracks?ids=${encodeURIComponent(
+          listOfId.join(",")
+        )}&market=IN`,
+        authOptions
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch Tracks: ${response.status} ${
+            response.statusText
+          } - ${data.error?.message || "Unknown error"}`
+        );
+      }
+
+      console.log("Tracks received:", data.tracks?.length || 0);
+      console.log(data.tracks);
+      setUserFavoriteTracks(data.tracks);
+    }
+    catch (err) {
+      const errorMessage = `Album fetch failed: ${err.message}`;
+      console.error(errorMessage);
+      setErrorTracks(errorMessage);
+      setUserFavoriteTracks([]);
+    }
+    finally {
+      setLoadingTracks(false);
+    }
+  };
+
   const getFavorites = async () => {
     if (!stableUser) return [];
 
@@ -132,6 +183,26 @@ const LibraryPage = () => {
 
       const favorites = querySnapshot.docs
         .filter((d) => d.data().type === "album") // Only include albums
+        .map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+      return favorites.map((fav) => fav.id);
+    } catch (err) {
+      console.log("Error fetching favorites: ", err);
+      return [];
+    }
+  };
+
+  const getFavoritesSongs = async () => {
+    if (!stableUser) return [];
+
+    try {
+      const favoriteRef = collection(db, `users/${user.uid}/favorites`);
+      const querySnapshot = await getDocs(favoriteRef);
+
+      const favorites = querySnapshot.docs
+        .filter((d) => d.data().type === "Track") // Only include tracks
         .map((d) => ({
           id: d.id,
           ...d.data(),
@@ -161,12 +232,19 @@ const LibraryPage = () => {
         await spotifyToken();
         const currentToken = localStorage.getItem("spotify_token");
         const out = await getFavorites();
-        console.log(out);
+        const out2 = await getFavoritesSongs();
+        console.log(out2);
         if (out.length > 0 && currentToken) {
           getAlbums(out, currentToken);
         }
         if (out.length > 0 && !currentToken) {
           getAlbums(out);
+        }
+        if (out2.length > 0 && currentToken) {
+          getTracks(out2, currentToken);
+        }
+        if (out2.length > 0 && !currentToken) {
+          getTracks(out2);
         }
       }
     };
@@ -192,6 +270,19 @@ const LibraryPage = () => {
           loading={loading}
           albums={userFavoriteAlbums}
           token={token}
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="p-4 w-fit text-3xl font-bold text-gray-100 hover:text-white glow"
+        >
+          | Favorite Tracks
+        </motion.div>
+        <FavoriteTracks
+          loading={loadingTracks}
+          tracks={userFavoriteTracks}
+          className="z-100"
         />
       </div>
     </main>
