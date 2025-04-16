@@ -334,7 +334,7 @@ const Player = () => {
       console.log("fetching...");
       try {
         const response = await fetch(
-          `https://music-fetch-jiosaavn.vercel.app/api/search/songs?query=${trackName}&limit=1`
+          `https://saavn.dev/api/search/songs?query=${trackName}&limit=1`
         );
         if (!response.ok) throw new Error("Failed to fetch track data");
 
