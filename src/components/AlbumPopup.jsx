@@ -36,7 +36,7 @@ const AlbumPopup = ({ album, onClose }) => {
     };
 
     checkFavoriteStatus();
-  }, [user, album?.id]); // Depend on user and album.id to re-run when they change
+  }, [user, album?.id]); // Depends on user and album.id to re-run when they change
 
   const checkIfFavorited = async (userId, itemId) => {
     if (!userId || !itemId) return false;
