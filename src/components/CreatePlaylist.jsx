@@ -1,43 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { auth, db, doc, setDoc, getDoc } from "../firebase/firebase";
-import { deleteDoc } from "firebase/firestore";
-import { X, Plus, Music, Search, MoreVertical, Play, Clock } from "lucide-react";
+import { collection, deleteDoc, getDocs } from "firebase/firestore";
+import {
+  X,
+  Plus,
+  Music,
+  Search,
+  MoreVertical,
+  Play,
+  Clock,
+} from "lucide-react";
 
 export default function CreatePlaylist({ onClose, onCurrent }) {
   const [user, setUser] = useState(null);
-  
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        console.log("User didn't login.");
-        navigate("/login");
-      } else {
-        setUser(user);
-      }
-    });
-    return () => unsubscribe();
-  });
-
   const [playlists, setPlaylists] = useState([]);
-    // {
-    //   id: "1",
-    //   name: "My Favorite Tracks",
-    //   description: "All my top tracks in one place",
-    //   imageUrl: "/api/placeholder/120/120",
-    //   owner: "Your Account",
-    //   trackCount: 42,
-    //   duration: 9360000, // in ms (2 hours 36 min)
-    // },
-  
+  // {
+  //   id: "1",
+  //   name: "My Favorite Tracks",
+  //   description: "All my top tracks in one place",
+  //   imageUrl: "/api/placeholder/120/120",
+  //   owner: "Your Account",
+  //   trackCount: 42,
+  //   duration: 9360000, // in ms (2 hours 36 min)
+  // },
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
-  
+
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [playlistId, setPlaylistId] = useState(null);
+
   const handleCreatePlaylist = async () => {
-    if (!newPlaylistName.trim()) return;
-    
+    if (!user?.uid || !newPlaylistName.trim()) return;
+
     const newPlaylist = {
       id: `${user?.uid}${Date.now()}`,
       name: newPlaylistName,
@@ -47,34 +45,63 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
       trackCount: 0,
       duration: 0,
     };
-    
-    
+
     const playlistRef = doc(db, `users/${user?.uid}/playlists`, newPlaylist.id);
-    
+
     try {
-      // await setDoc(playlistRef, newPlaylist);
-      // console.log("Playlist created successfully");
+      await setDoc(playlistRef, newPlaylist);
+      console.log("Playlist created successfully");
       setPlaylists([newPlaylist, ...playlists]);
     } catch (error) {
       console.error("Error creating playlist:", error);
-    }
-    finally {
+    } finally {
       setNewPlaylistName("");
       setNewPlaylistDescription("");
       setIsCreatingPlaylist(false);
     }
-
   };
-  
-  const filteredPlaylists = playlists.filter(playlist => 
+
+  // TODO: Connect this to frontend
+  const handleDeletePlaylist = async (playlistId) => {
+    if (!playlistId) return;
+    const playlistRef = doc(db, `users/${user?.uid}/playlists`, playlistId);
+    try {
+      await deleteDoc(playlistRef);
+      console.log("Playlist deleted successfully");
+      setPlaylists(playlists.filter((playlist) => playlist.id !== playlistId));
+    } catch (error) {
+      console.error("Error deleting playlist:", error);
+    }
+  };
+
+  const fetchPlaylists = async (uid) => {
+    if (!uid) return;
+    console.log("Fetching playlists for user:", uid);
+    try {
+      const playlistsRef = collection(db, `users/${uid}/playlists`);
+      const snapshot = await getDocs(playlistsRef);
+      const playlists = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      console.log("Playlists fetched successfully:", playlists);
+      setPlaylists(playlists);
+    } catch (error) {
+      console.error("Error fetching playlists:", error);
+      setPlaylists([]);
+    }
+  };
+
+  const filteredPlaylists = playlists.filter((playlist) =>
     playlist.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
+
   const formatDuration = (ms) => {
     const minutes = Math.floor(ms / 60000);
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    
+
     if (hours > 0) {
       return `${hours} hr ${remainingMinutes} min`;
     }
@@ -82,12 +109,23 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
   };
 
   useEffect(() => {
-    console.log("Track:", onCurrent);
-  })
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        console.log("User didn't login.");
+        navigate("/login");
+      } else {
+        // console.log("User logged in:", user);
+        setUser(user);
+        fetchPlaylists(user.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 min-h-screen"
       onClick={onClose}
     >
       <motion.div
@@ -110,7 +148,7 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         {/* Search and Create */}
         <div className="p-4 md:p-6 border-b border-zinc-700 flex flex-col md:flex-row gap-3 md:gap-4 items-center">
           <div className="relative w-full md:flex-1">
@@ -123,7 +161,7 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
               className="w-full bg-zinc-800 text-zinc-100 py-2 pl-10 pr-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-600 text-sm"
             />
           </div>
-          
+
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -134,7 +172,7 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
             <span>New Playlist</span>
           </motion.button>
         </div>
-        
+
         {/* Create Playlist Form */}
         {isCreatingPlaylist && (
           <div className="p-4 md:p-6 border-b border-zinc-700 bg-zinc-800">
@@ -152,7 +190,9 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
                 />
               </div>
               <div>
-                <label className="text-sm text-zinc-300 mb-1 block">Description (optional)</label>
+                <label className="text-sm text-zinc-300 mb-1 block">
+                  Description (optional)
+                </label>
                 <textarea
                   value={newPlaylistDescription}
                   onChange={(e) => setNewPlaylistDescription(e.target.value)}
@@ -175,8 +215,8 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
                   onClick={handleCreatePlaylist}
                   disabled={!newPlaylistName.trim()}
                   className={`font-medium py-2 px-4 rounded-lg text-sm ${
-                    newPlaylistName.trim() 
-                      ? "bg-white hover:bg-gray-200 text-zinc-900" 
+                    newPlaylistName.trim()
+                      ? "bg-white hover:bg-gray-200 text-zinc-900"
                       : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                   }`}
                 >
@@ -186,9 +226,9 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
             </div>
           </div>
         )}
-        
+
         {/* Playlists List */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 max-h-[60vh]">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {filteredPlaylists.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-zinc-400">
               <Music className="w-8 h-8 mb-2" />
@@ -200,7 +240,7 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
                 <motion.li
                   key={playlist.id}
                   whileHover={{ backgroundColor: "rgba(63, 63, 70, 0.6)" }}
-                  className="flex gap-3 p-3 rounded-lg cursor-pointer group"
+                  className="flex gap-3 p-3 rounded-lg cursor-pointer group border border-zinc-800 hover:border-zinc-600"
                 >
                   <div className="relative w-16 h-16 flex-shrink-0">
                     <img
@@ -218,17 +258,26 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
                       </motion.button>
                     </div>
                   </div>
-                  
-                  <div className="flex-1 min-w-0">
+
+                  <div
+                    className="flex-1 min-w-0"
+                    onClick={() => {
+                      setPlaylistOpen((prev) => !prev);
+                      setPlaylistId(playlist.id);
+                    }}
+                  >
                     <div className="flex justify-between items-start">
-                      <h3 className="font-medium text-zinc-100 line-clamp-1">{playlist.name}</h3>
+                      <h3 className="font-medium text-zinc-100 line-clamp-1">
+                        {playlist.name}
+                      </h3>
                       <button className="text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity">
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
-                    <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{playlist.description}</p>
+                    <p className="text-xs text-zinc-400 mt-1 line-clamp-1">
+                      {playlist.description}
+                    </p>
                     <div className="flex items-center gap-2 mt-2 text-xs text-zinc-500">
-                      <span>•</span>
                       <span>{playlist.trackCount} tracks</span>
                       <span>•</span>
                       <span className="flex items-center gap-1">

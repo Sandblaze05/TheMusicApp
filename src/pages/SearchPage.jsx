@@ -428,12 +428,12 @@ const SearchPage = () => {
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto space-y-8 mb-15">
         <TracksSection />
-        {menuOpen && (
+        {menuOpen ? (
           <CreatePlaylist 
             onClose={handleMenuToggle}
             onCurrent={track}
           />
-        )}
+        ) : null}
         <AlbumsSection />
         {albumContent && (
           <AlbumPopup
