@@ -10,7 +10,9 @@ import {
   MoreVertical,
   Play,
   Clock,
+  Trash,
 } from "lucide-react";
+import ConfirmDialog from "./ConfirmDialog";
 
 export default function CreatePlaylist({ onClose, onCurrent }) {
   const [user, setUser] = useState(null);
@@ -32,6 +34,8 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
 
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [playlistId, setPlaylistId] = useState(null);
+
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const handleCreatePlaylist = async () => {
     if (!user?.uid || !newPlaylistName.trim()) return;
@@ -62,13 +66,14 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
   };
 
   // TODO: Connect this to frontend
-  const handleDeletePlaylist = async (playlistId) => {
+  const handleDeletePlaylist = async () => {
     if (!playlistId) return;
     const playlistRef = doc(db, `users/${user?.uid}/playlists`, playlistId);
     try {
       await deleteDoc(playlistRef);
       console.log("Playlist deleted successfully");
       setPlaylists(playlists.filter((playlist) => playlist.id !== playlistId));
+      setConfirmDialogOpen(false);
     } catch (error) {
       console.error("Error deleting playlist:", error);
     }
@@ -139,14 +144,19 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
       >
         {/* Header */}
         <div className="bg-zinc-800 p-4 md:p-6 flex justify-between items-center border-b border-zinc-700">
-          <h2 className="text-xl md:text-2xl font-bold">Your Playlists</h2>
-          <button
-            className="text-zinc-400 hover:text-zinc-100 transition-colors p-2 hover:bg-zinc-700 rounded-full"
+          <h2 className="text-xl md:text-2xl font-bold">
+            Add To Your Playlists
+          </h2>
+          <motion.button
+            className="text-zinc-400 hover:text-zinc-100 p-2 hover:bg-zinc-700 rounded-full"
             onClick={onClose}
             aria-label="Close"
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{ duration: 0.2 }}
           >
             <X className="w-5 h-5" />
-          </button>
+          </motion.button>
         </div>
 
         {/* Search and Create */}
@@ -270,8 +280,14 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
                       <h3 className="font-medium text-zinc-100 line-clamp-1">
                         {playlist.name}
                       </h3>
-                      <button className="text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="w-4 h-4" />
+                      <button className="text-zinc-400 hover:text-zinc-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <Trash
+                          className="w-4 h-4"
+                          onClick={() => {
+                            setConfirmDialogOpen((prev) => !prev);
+                            setPlaylistId(playlist.id);
+                          }}
+                        />
                       </button>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1 line-clamp-1">
@@ -292,6 +308,12 @@ export default function CreatePlaylist({ onClose, onCurrent }) {
           )}
         </div>
       </motion.div>
+      {confirmDialogOpen ? (
+        <ConfirmDialog
+          onClose={() => setConfirmDialogOpen((prev) => !prev)}
+          onConfirm={handleDeletePlaylist}
+        />
+      ) : null}
     </div>
   );
 }
